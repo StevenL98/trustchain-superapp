@@ -43,7 +43,7 @@ class TipArtistDialog(private val publicKey: String, private val artists: String
         builder.setView(dialogView)
             .setPositiveButton("Confirm", DialogInterface.OnClickListener { _, _ ->
                 val amount = amountEditText?.text.toString()
-                if (false) {
+                if (false) { // TODO remove this if false, this is so that we don't pay the coin every time.
                     walletService.sendCoins(publicKey, amount)
                 }
                 val action =
