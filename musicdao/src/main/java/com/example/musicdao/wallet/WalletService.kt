@@ -146,7 +146,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
             return
         }
 
-        val clientKey = app.wallet().importedKeys
+        val clientKey = ECKey()
         val serverKey = ECKey()
 
         val contract = Transaction(params)
