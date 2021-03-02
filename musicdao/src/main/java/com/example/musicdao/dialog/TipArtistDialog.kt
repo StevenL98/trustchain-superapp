@@ -7,8 +7,10 @@ import android.os.Bundle
 import android.widget.EditText
 import android.widget.TextView
 import androidx.fragment.app.DialogFragment
+import androidx.navigation.fragment.findNavController
 import com.example.musicdao.MusicService
 import com.example.musicdao.R
+import com.example.musicdao.catalog.PlaylistsOverviewFragmentDirections
 import com.example.musicdao.wallet.WalletService
 import java.math.BigDecimal
 
@@ -16,7 +18,8 @@ import java.math.BigDecimal
  * This dialog is shown when the user wants to send a tip to the publisher of a Release, using BTC
  * @param publicKey the Bitcoin wallet public key to send the tip to
  */
-class TipArtistDialog(private val publicKey: String) : DialogFragment() {
+class TipArtistDialog(private val publicKey: String, private val artists: String) :
+    DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val builder = AlertDialog.Builder(activity)
         // Get the layout inflater
@@ -40,7 +43,16 @@ class TipArtistDialog(private val publicKey: String) : DialogFragment() {
         builder.setView(dialogView)
             .setPositiveButton("Confirm", DialogInterface.OnClickListener { _, _ ->
                 val amount = amountEditText?.text.toString()
-                walletService.sendCoins(publicKey, amount)
+                if (false) {
+                    walletService.sendCoins(publicKey, amount)
+                }
+                val action =
+                    PlaylistsOverviewFragmentDirections.actionPlaylistsOverviewFragmentToVotesFragment(
+                        artists,
+                        amount
+                    );
+                findNavController().navigateUp()
+                findNavController().navigate(action)
             }).setNegativeButton("Cancel", DialogInterface.OnClickListener { _, _ ->
                 dialog?.cancel()
             })
