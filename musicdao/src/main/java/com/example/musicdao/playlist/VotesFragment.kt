@@ -15,7 +15,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
+import com.example.musicdao.MusicService
 import com.example.musicdao.R
+import com.example.musicdao.wallet.WalletService
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.android.synthetic.main.fragment_votes.*
@@ -69,6 +71,9 @@ class VotesFragment : Fragment() {
                     userHasAlreadyVoted()
                     adapter.notifyChanges()
 
+                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
+                    walletService.signUser1()
                     // TODO: send yes vote for user1
                 }
 
@@ -95,6 +100,10 @@ class VotesFragment : Fragment() {
                     voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
                     adapter.notifyChanges()
+
+                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
+                    walletService.signUser2()
 
                     // TODO: send yes vote for user2
                 }

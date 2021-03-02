@@ -45,16 +45,14 @@ class TipArtistDialog(private val publicKey: String, private val artists: String
         builder.setView(dialogView)
             .setPositiveButton("Confirm", DialogInterface.OnClickListener { _, _ ->
                 val amount = amountEditText?.text.toString()
-//                if (false) {
-                    walletService.hardcodedShit(publicKey, amount)
-//                }
-//                val action =
-//                    PlaylistsOverviewFragmentDirections.actionPlaylistsOverviewFragmentToVotesFragment(
-//                        artists,
-//                        amount
-//                    );
-//                findNavController().navigateUp()
-//                findNavController().navigate(action)
+                walletService.createProposal(publicKey, amount)
+                val action =
+                    PlaylistsOverviewFragmentDirections.actionPlaylistsOverviewFragmentToVotesFragment(
+                        artists,
+                        amount
+                    );
+                findNavController().navigateUp()
+                findNavController().navigate(action)
             }).setNegativeButton("Cancel", DialogInterface.OnClickListener { _, _ ->
                 dialog?.cancel()
             })
