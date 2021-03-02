@@ -32,8 +32,9 @@ class VotesFragment : Fragment() {
     private val TAB_NAMES = arrayOf("Upvotes", "Downvotes", "Undecided votes")
 
     // initialize voters with 0 pro, 0 against and 2 undecided votes
+    //TODO call countVotes from api.
     private val voters =
-        mutableMapOf(0 to arrayListOf(), 1 to arrayListOf(), 2 to arrayListOf("Rick", "Steven"))
+        mutableMapOf(0 to arrayListOf(), 1 to arrayListOf(), 2 to arrayListOf("user1", "user2"))
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -63,18 +64,22 @@ class VotesFragment : Fragment() {
                 builder.setMessage(getString(R.string.bounty_payout_message,price,title,1,2,3))
                 builder.setPositiveButton("YES") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, title), Toast.LENGTH_SHORT).show()
-                    voters[0]!!.add("Rick")
-                    voters[2]!!.remove("Rick")
+                    voters[0]!!.add("user1")
+                    voters[2]!!.remove("user1")
                     userHasAlreadyVoted()
                     adapter.notifyChanges()
+
+                    // TODO: send yes vote for user1
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, title),Toast.LENGTH_SHORT).show()
-                    voters[1]!!.add("Rick")
-                    voters[2]!!.remove("Rick")
+                    voters[1]!!.add("user1")
+                    voters[2]!!.remove("user1")
                     userHasAlreadyVoted()
                     adapter.notifyChanges()
+
+                    // TODO: send no vote for user1
                 }
                 builder.show()
             }
@@ -86,18 +91,22 @@ class VotesFragment : Fragment() {
                 builder.setMessage(getString(R.string.bounty_payout_message,price,title,1,2,3))
                 builder.setPositiveButton("YES") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, title), Toast.LENGTH_SHORT).show()
-                    voters[0]!!.add("Steven")
-                    voters[2]!!.remove("Steven")
+                    voters[0]!!.add("user2")
+                    voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
                     adapter.notifyChanges()
+
+                    // TODO: send yes vote for user2
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, title),Toast.LENGTH_SHORT).show()
-                    voters[1]!!.add("Steven")
-                    voters[2]!!.remove("Steven")
+                    voters[1]!!.add("user2")
+                    voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
                     adapter.notifyChanges()
+
+                    // TODO: send no vote for user2
                 }
                 builder.show()
             }

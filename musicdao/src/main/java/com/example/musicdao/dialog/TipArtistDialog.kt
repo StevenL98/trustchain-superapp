@@ -36,6 +36,8 @@ class TipArtistDialog(private val publicKey: String, private val artists: String
         val instructionText = dialogView?.findViewById<TextView>(R.id.instructionText)
         instructionText?.text = "Sending a tip to artist(s), with public key: $publicKey"
 
+        // Todo: Create proposal
+
         val amountEditText = dialogView?.findViewById<EditText>(R.id.amount)
         val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
         val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
