@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.example.musicdao.MusicService
@@ -63,7 +64,7 @@ class VotesFragment : Fragment() {
             fab_user.setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
                 builder.setTitle(getString(R.string.bounty_payout, price, title))
-                builder.setMessage(getString(R.string.bounty_payout_message,price,title,1,2,3))
+                builder.setMessage(getString(R.string.bounty_payout_message,price,title,voters[0]!!.size,voters[1]!!.size,voters[2]!!.size))
                 builder.setPositiveButton("YES") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, title), Toast.LENGTH_SHORT).show()
                     voters[0]!!.add("user1")
@@ -73,7 +74,10 @@ class VotesFragment : Fragment() {
 
                     val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
                     val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
-                    walletService.signUser1()
+                    val result = walletService.signUser1()
+                    if (result) {
+                        findNavController().navigateUp()
+                    }
                     // TODO: send yes vote for user1
                 }
 
@@ -93,7 +97,7 @@ class VotesFragment : Fragment() {
             fab_demo.setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
                 builder.setTitle(getString(R.string.bounty_payout, price, title))
-                builder.setMessage(getString(R.string.bounty_payout_message,price,title,1,2,3))
+                builder.setMessage(getString(R.string.bounty_payout_message,price,title,voters[0]!!.size,voters[1]!!.size,voters[2]!!.size))
                 builder.setPositiveButton("YES") { _, _ ->
                     Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, title), Toast.LENGTH_SHORT).show()
                     voters[0]!!.add("user2")
@@ -103,7 +107,10 @@ class VotesFragment : Fragment() {
 
                     val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
                     val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
-                    walletService.signUser2()
+                    val result = walletService.signUser2()
+                    if (result) {
+                        findNavController().navigateUp()
+                    }
 
                     // TODO: send yes vote for user2
                 }

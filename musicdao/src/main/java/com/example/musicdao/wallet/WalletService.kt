@@ -2,6 +2,7 @@ package com.example.musicdao.wallet
 
 import android.util.Log
 import android.widget.Toast
+import androidx.navigation.fragment.findNavController
 import com.example.musicdao.MusicService
 import org.bitcoinj.core.*
 import org.bitcoinj.core.listeners.DownloadProgressTracker
@@ -171,7 +172,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
     }
 
 
-    fun signUser1() {
+    fun signUser1() : Boolean {
         // serverside
         val multisigOutput = currentTransaction.getOutput(0)
         val multisigScript = multisigOutput.scriptPubKey
@@ -180,7 +181,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
             check(ScriptPattern.isSentToMultisig(multisigScript))
         } catch (e: Exception) {
             musicService.showToast("multisig script doesn't match format", Toast.LENGTH_LONG)
-            return
+            return false
         }
 
         val coinValue = multisigOutput.value
@@ -196,10 +197,10 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
         val sighash = spendTx!!.hashForSignature(0, multisigScript, Transaction.SigHash.ALL, false)
         serverSignature = serverKey.sign(sighash)
 
-        verifyTransaction()
+        return verifyTransaction()
     }
 
-    fun signUser2() {
+    fun signUser2(): Boolean{
         // serverside
         val multisigOutput = currentTransaction.getOutput(0)
         val multisigScript = multisigOutput.scriptPubKey
@@ -208,7 +209,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
             check(ScriptPattern.isSentToMultisig(multisigScript))
         } catch (e: Exception) {
             musicService.showToast("multisig script doesn't match format", Toast.LENGTH_LONG)
-            return
+            return false
         }
 
         val coinValue = multisigOutput.value
@@ -224,12 +225,12 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
         val sighashClient = spendTx!!.hashForSignature(0, multisigScript, Transaction.SigHash.ALL, false)
         clientSignature = clientKey.sign(sighashClient)
 
-        verifyTransaction()
+        return verifyTransaction()
     }
 
-    fun verifyTransaction() {
+    fun verifyTransaction() : Boolean {
         // complete transaction
-        if(clientSignature == null || serverSignature == null) return
+        if(clientSignature == null || serverSignature == null) return false
 
         val transactionSignatures = listOf<ECKey.ECDSASignature>(clientSignature!!, serverSignature!!).map { sig ->
             TransactionSignature(sig, Transaction.SigHash.ALL, false)
@@ -243,7 +244,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
         } catch (e: ScriptException) {
             Log.i("TYFUS", e.toString())
             musicService.showToast(e.toString(), Toast.LENGTH_LONG)
-            return
+            return false
         }
 
         val req = SendRequest.forTx(currentTransaction)
@@ -257,12 +258,14 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
                 Coin.valueOf(currentTransactionAmount).toFriendlyString()
                 }", Toast.LENGTH_SHORT
             )
+            return true
         } catch (e: Exception) {
             musicService.showToast(
                 "Error creating transaction (do you have sufficient funds?)",
                 Toast.LENGTH_SHORT
             )
         }
+        return false
     }
 
     /**
