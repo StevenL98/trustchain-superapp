@@ -82,7 +82,7 @@ class VotesFragment : Fragment() {
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, title),Toast.LENGTH_SHORT).show()
+                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, artists),Toast.LENGTH_SHORT).show()
                     voters[1]!!.add("user1")
                     voters[2]!!.remove("user1")
                     userHasAlreadyVoted()
@@ -116,7 +116,7 @@ class VotesFragment : Fragment() {
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, title),Toast.LENGTH_SHORT).show()
+                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, artists),Toast.LENGTH_SHORT).show()
                     voters[1]!!.add("user2")
                     voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
