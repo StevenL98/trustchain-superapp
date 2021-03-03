@@ -8,7 +8,10 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.fragment_join_network.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
@@ -104,7 +107,7 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
             }
 
         Log.i("Coin", "${distinctById.size} unique wallets founds. Adding if not present already.")
-
+        Log.i("Callum", "Distinct by id: ${distinctById}")
         for (wallet in distinctById) {
             val currentId = SWJoinBlockTransactionData(wallet.transaction).getData().SW_UNIQUE_ID
             if (!walletIds.contains(currentId)) {
@@ -151,17 +154,29 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
      */
     private suspend fun crawlAvailableSharedWallets() {
         val allUsers = getDemoCommunity().getPeers()
-        Log.i("Coin", "Found ${allUsers.size} peers, crawling")
 
+        Log.i("Callum","${allUsers.size}")
+//        Log.i("Coin", "Found ${allUsers.size} peers, crawling")
         for (peer in allUsers) {
             try {
-                withTimeout(SW_CRAWLING_TIMEOUT_MILLI) {
-                    trustchain.crawlChain(peer)
-                    val crawlResult = trustchain
+                trustchain.crawlChain(peer)
+                val crawlResult = trustchain
                         .getChainByUser(peer.publicKey.keyToBin())
-
-                    updateSharedWallets(crawlResult)
+                updateSharedWallets(crawlResult)
+                for (crawl in crawlResult) {
+                    Log.i("Callum", " crawl: ${crawl.blockId}")
                 }
+//                val lsw = getCoinCommunity().discoverSharedWallets()
+//                val swBlocks = getTrustChainCommunity().database.getBlo
+//                val publicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
+//                Log.i("Callum", " Blocks: ${swBlocks}")
+//                withTimeout(SW_CRAWLING_TIMEOUT_MILLI) {
+//                    trustchain.crawlChain(peer)
+//                    val crawlResult = trustchain
+//                        .getChainByUser(peer.publicKey.keyToBin())
+//
+//                    updateSharedWallets(crawlResult)
+//                }
             } catch (t: Throwable) {
                 val message = t.message ?: "No further information"
                 Log.i("Coin", "Crawling failed for: ${peer.publicKey}. $message.")
