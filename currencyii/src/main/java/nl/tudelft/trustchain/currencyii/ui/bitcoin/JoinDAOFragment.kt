@@ -7,7 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import kotlinx.android.synthetic.main.fragment_join_network.*
+import kotlinx.android.synthetic.main.fragment_shared_wallet_transaction.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,13 +157,13 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
     private suspend fun crawlAvailableSharedWallets() {
         val allUsers = getDemoCommunity().getPeers()
 
-        Log.i("Callum","${allUsers.size}")
+        Log.i("Callum", "${allUsers.size}")
 //        Log.i("Coin", "Found ${allUsers.size} peers, crawling")
         for (peer in allUsers) {
             try {
                 trustchain.crawlChain(peer)
                 val crawlResult = trustchain
-                        .getChainByUser(peer.publicKey.keyToBin())
+                    .getChainByUser(peer.publicKey.keyToBin())
                 updateSharedWallets(crawlResult)
                 for (crawl in crawlResult) {
                     Log.i("Callum", " crawl: ${crawl.blockId}")
@@ -260,6 +262,17 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
         setAlertText(
             "Collecting signatures: ${signatures.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
         )
+        activity?.runOnUiThread {
+            alert_tf?.setOnClickListener {
+                val action = JoinDAOFragmentDirections.toVotesFragment(
+                    blockData.SW_UNIQUE_ID,
+                    // TODO: get correct amount
+                    "35"
+                )
+                findNavController().navigate(action)
+            }
+        }
+
 
         if (signatures.size >= blockData.SW_SIGNATURES_REQUIRED) {
             return signatures
