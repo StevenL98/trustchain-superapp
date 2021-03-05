@@ -1,4 +1,4 @@
-package com.example.musicdao.playlist
+package nl.tudelft.trustchain.common.ui
 
 import android.content.Context
 import android.os.Build
@@ -16,19 +16,15 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
-import com.example.musicdao.MusicService
-import com.example.musicdao.R
-import com.example.musicdao.wallet.WalletService
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.android.synthetic.main.fragment_votes.*
+import nl.tudelft.trustchain.common.R
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 
-
-class VotesFragment : Fragment() {
-
+class VotesFragment : BaseFragment(R.layout.fragment_votes) {
     private lateinit var adapter: Adapter
     private lateinit var viewPager: ViewPager2
 
@@ -55,34 +51,52 @@ class VotesFragment : Fragment() {
 
         val localArgs = arguments
         if (localArgs is Bundle) {
-            val artists = localArgs.getString("artists", "Artists not found")
-            val price = localArgs.getString("amount", "Price not found") + "BTC"
+            val walletId = localArgs.getString("title", "Title not found")
+            val priceString = localArgs.getString("amount", "Price not found") + "BTC"
             val userHasVoted = false
 
-            cover_title.text = artists
-            vote_tip_price.text = getString(R.string.bounty_payout, price, artists)
+            wallet_id.text = walletId
+            price.text = getString(R.string.bounty_payout, priceString, walletId)
             fab_user.setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
-                builder.setTitle(getString(R.string.bounty_payout, price, artists))
-                builder.setMessage(getString(R.string.bounty_payout_message,price,artists,voters[0]!!.size,voters[1]!!.size,voters[2]!!.size))
+                builder.setTitle(getString(R.string.bounty_payout, priceString, walletId))
+                builder.setMessage(
+                    getString(
+                        R.string.bounty_payout_message,
+                        priceString,
+                        walletId,
+                        voters[0]!!.size,
+                        voters[1]!!.size,
+                        voters[2]!!.size
+                    )
+                )
                 builder.setPositiveButton("YES") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, artists), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        v.context,
+                        getString(R.string.bounty_payout_upvoted, priceString, walletId),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     voters[0]!!.add("user1")
                     voters[2]!!.remove("user1")
                     userHasAlreadyVoted()
                     adapter.notifyChanges()
 
-                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
-                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
-                    val result = walletService.signUser1()
-                    if (result) {
+//                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+//                    val walletService =
+//                        WalletService.getInstance(walletDir, (activity as MusicService))
+//                    val result = walletService.signUser1()
+//                    if (result) {
+                    if (voters[2]!!.size == 0) {
                         findNavController().navigateUp()
                     }
                     // TODO: send yes vote for user1
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, artists),Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        v.context, getString(R.string.bounty_payout_downvoted, priceString, walletId),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     voters[1]!!.add("user1")
                     voters[2]!!.remove("user1")
                     userHasAlreadyVoted()
@@ -96,19 +110,34 @@ class VotesFragment : Fragment() {
             // FOR THE DEMO TOMORROW
             fab_demo.setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
-                builder.setTitle(getString(R.string.bounty_payout, price, artists))
-                builder.setMessage(getString(R.string.bounty_payout_message,price,artists,voters[0]!!.size,voters[1]!!.size,voters[2]!!.size))
+                builder.setTitle(getString(R.string.bounty_payout, priceString, walletId))
+                builder.setMessage(
+                    getString(
+                        R.string.bounty_payout_message,
+                        priceString,
+                        walletId,
+                        voters[0]!!.size,
+                        voters[1]!!.size,
+                        voters[2]!!.size
+                    )
+                )
                 builder.setPositiveButton("YES") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_upvoted, price, artists), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        v.context,
+                        getString(R.string.bounty_payout_upvoted, priceString, walletId),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     voters[0]!!.add("user2")
                     voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
                     adapter.notifyChanges()
 
-                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
-                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
-                    val result = walletService.signUser2()
-                    if (result) {
+//                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+//                    val walletService =
+//                        WalletService.getInstance(walletDir, (activity as MusicService))
+//                    val result = walletService.signUser2()
+//                    if (result) {
+                    if (voters[2]!!.size == 0) {
                         findNavController().navigateUp()
                     }
 
@@ -116,7 +145,10 @@ class VotesFragment : Fragment() {
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(v.context,getString(R.string.bounty_payout_downvoted, price, artists),Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        v.context, getString(R.string.bounty_payout_downvoted, priceString, walletId),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     voters[1]!!.add("user2")
                     voters[2]!!.remove("user2")
                     fab_demo.visibility = View.GONE
@@ -229,7 +261,7 @@ class VotesAdapter(
 
         if (tabPosition != 2) {
             // Remove this when actual data
-            val simpleDateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
+            val simpleDateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault())
             val formatted = simpleDateFormat.format(Date())
 
             view.findViewById<TextView>(R.id.voter_time).text = formatted.toString()
