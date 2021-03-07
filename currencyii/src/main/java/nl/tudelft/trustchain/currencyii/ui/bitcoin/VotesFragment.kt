@@ -44,7 +44,6 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
             val block = getCoinCommunity().fetchProposalBlocks()[position]
 
             val rawData = SWTransferFundsAskTransactionData(block.transaction)
-            voters = rawData.SW_VOTES
             val data = rawData.getData()
 
             val walletId = data.SW_UNIQUE_PROPOSAL_ID
@@ -55,9 +54,11 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
                     data.SW_UNIQUE_ID,
                     data.SW_UNIQUE_PROPOSAL_ID
                 ))
+            voters = rawData.SW_VOTES
             voters[0] = signatures
             voters[2]!!.removeAll(signatures)
-            val userHasVoted = voters[2]!!.contains(userID)
+            // TODO: Commented out for debugging purposes and since the userID is not present in the list of voters somehow?
+            val userHasVoted = false // !voters[2]!!.contains(userID)
 
             view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
 
