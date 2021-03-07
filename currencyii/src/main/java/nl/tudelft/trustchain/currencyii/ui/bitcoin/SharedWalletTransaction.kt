@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import kotlinx.android.synthetic.main.fragment_shared_wallet_transaction.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,6 +70,7 @@ class SharedWalletTransaction : BaseFragment(R.layout.fragment_shared_wallet_tra
                 alert_view.text =
                     "Failed: Bitcoin PK should be a string, minimal satoshi amount: ${SWUtil.MINIMAL_TRANSACTION_AMOUNT}"
             }
+            return
         }
         val bitcoinPublicKey = input_bitcoin_public_key.text.toString()
         val satoshiTransferAmount = input_satoshi_amount.text.toString().toLong()
@@ -182,7 +182,11 @@ class SharedWalletTransaction : BaseFragment(R.layout.fragment_shared_wallet_tra
 
     private fun validateTransferInput(): Boolean {
         val bitcoinPublicKey = input_bitcoin_public_key.text.toString()
-        val satoshiTransferAmount = input_satoshi_amount.text.toString().toLong()
+        val satoshiTransferAmount: Long = try {
+            input_satoshi_amount.text.toString().toLong()
+        } catch (e: NumberFormatException) {
+            0
+        }
         return bitcoinPublicKey != "" && satoshiTransferAmount >= SWUtil.MINIMAL_TRANSACTION_AMOUNT && blockHash != null
     }
 

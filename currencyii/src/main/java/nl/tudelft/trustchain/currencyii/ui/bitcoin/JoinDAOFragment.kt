@@ -262,17 +262,6 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
         setAlertText(
             "Collecting signatures: ${signatures.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
         )
-        activity?.runOnUiThread {
-            alert_tf?.setOnClickListener {
-                val action = JoinDAOFragmentDirections.toVotesFragment(
-                    blockData.SW_UNIQUE_ID,
-                    // TODO: get correct amount
-                    "35"
-                )
-                findNavController().navigate(action)
-            }
-        }
-
 
         if (signatures.size >= blockData.SW_SIGNATURES_REQUIRED) {
             return signatures
