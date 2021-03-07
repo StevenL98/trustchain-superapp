@@ -14,18 +14,18 @@ import com.google.android.material.floatingactionbutton.ExtendedFloatingActionBu
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import nl.tudelft.trustchain.common.R
-import nl.tudelft.trustchain.common.ui.Adapter
+import nl.tudelft.trustchain.common.ui.TabsAdapter
 
 class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
 
-    private lateinit var adapter: Adapter
+    private lateinit var tabsAdapter: TabsAdapter
     private lateinit var viewPager: ViewPager2
 
     private val TAB_NAMES = arrayOf("Upvotes", "Downvotes", "Undecided votes")
 
     // initialize voters with 0 pro, 0 against and 2 undecided votes
     private val voters =
-        mutableMapOf(0 to arrayListOf(), 1 to arrayListOf(), 2 to arrayListOf("User1", "User2"))
+        hashMapOf(0 to arrayListOf(), 1 to arrayListOf(), 2 to arrayListOf("User1", "User2"))
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -37,9 +37,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 
-        adapter = Adapter(this, voters)
+        tabsAdapter = TabsAdapter(this, voters)
         viewPager = view.findViewById(R.id.viewpager)
-        viewPager.adapter = adapter
+        viewPager.adapter = tabsAdapter
 
         val localArgs = arguments
         if (localArgs is Bundle) {
@@ -76,7 +76,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     voters[0]!!.add("User1")
                     voters[2]!!.remove("User1")
                     userHasAlreadyVoted(view)
-                    adapter.notifyChanges()
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 0
                     checkIfAllVoted(v)
                 }
 
@@ -91,7 +93,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     voters[1]!!.add("User1")
                     voters[2]!!.remove("User1")
                     userHasAlreadyVoted(view)
-                    adapter.notifyChanges()
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 1
                     checkIfAllVoted(v)
                 }
                 builder.show()
@@ -122,7 +126,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     voters[0]!!.add("User2")
                     voters[2]!!.remove("User2")
                     view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
-                    adapter.notifyChanges()
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 0
                     checkIfAllVoted(v)
                 }
 
@@ -137,7 +143,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     voters[1]!!.add("User2")
                     voters[2]!!.remove("User2")
                     view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
-                    adapter.notifyChanges()
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 1
                     checkIfAllVoted(v)
                 }
                 builder.show()

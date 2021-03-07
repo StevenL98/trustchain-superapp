@@ -14,12 +14,12 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.common.R
-import nl.tudelft.trustchain.common.ui.Adapter
+import nl.tudelft.trustchain.common.ui.TabsAdapter
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWTransferFundsAskTransactionData
 
 class VotesFragment : BaseFragment(R.layout.fragment_votes) {
-    private lateinit var adapter: Adapter
+    private lateinit var tabsAdapter: TabsAdapter
     private lateinit var viewPager: ViewPager2
 
     private val TAB_NAMES = arrayOf("Upvotes", "Downvotes", "Undecided votes")
@@ -59,14 +59,14 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
             voters[2]!!.removeAll(signatures)
             val userHasVoted = voters[2]!!.contains(userID)
 
+            view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
+
             view.findViewById<TextView>(R.id.title).text = data.SW_UNIQUE_PROPOSAL_ID
             view.findViewById<TextView>(R.id.price).text = getString(R.string.bounty_payout, priceString, walletId)
             view.findViewById<ExtendedFloatingActionButton>(R.id.fab_user).setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
                 builder.setTitle(getString(R.string.bounty_payout, priceString, walletId))
-                builder.setMessage(
-                    getString(
-                        R.string.bounty_payout_message,
+                builder.setMessage(getString(R.string.bounty_payout_message,
                         priceString,
                         walletId,
                         voters[0]!!.size,
@@ -81,10 +81,10 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
                         Toast.LENGTH_SHORT
                     ).show()
                     voters = SWTransferFundsAskTransactionData(block.transaction).userVotes(userID, 0)
-                    println("AAAAA")
-                    println(voters.toString())
                     userHasAlreadyVoted(view)
-                    adapter.notifyChanges()
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 0
 
 //                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
 //                    val walletService =
@@ -106,8 +106,9 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
                     voters = SWTransferFundsAskTransactionData(block.transaction).userVotes(userID, 1)
 
                     userHasAlreadyVoted(view)
-                    adapter.notifyChanges()
-
+                    tabsAdapter = TabsAdapter(this, voters)
+                    viewPager.adapter = tabsAdapter
+                    viewPager.currentItem = 1
                     // TODO: send no vote for user1
                 }
                 builder.show()
@@ -118,9 +119,9 @@ class VotesFragment : BaseFragment(R.layout.fragment_votes) {
             }
         }
 
-        adapter = Adapter(this, voters)
         viewPager = view.findViewById(R.id.viewpager)
-        viewPager.adapter = adapter
+        tabsAdapter = TabsAdapter(this, voters)
+        viewPager.adapter = tabsAdapter
 
         val tabLayout = view.findViewById<TabLayout>(R.id.tab_layout)
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
