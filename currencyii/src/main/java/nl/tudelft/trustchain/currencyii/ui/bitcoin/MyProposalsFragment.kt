@@ -42,11 +42,15 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 
     private fun updateProposalListUI() {
         activity?.runOnUiThread {
-            val adaptor = ProposalListAdapter(this, proposals)
+            var uniqueProposals:ArrayList<TrustChainBlock> = ArrayList()
+            for (proposal in proposals) {
+                if (!uniqueProposals.contains(proposal)) uniqueProposals.add(proposal)
+            }
+            val adaptor = ProposalListAdapter(this, uniqueProposals)
             proposal_list_view.adapter = adaptor
             val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin()
             proposal_list_view.setOnItemClickListener { _, _, position, _ ->
-                val block = proposals[position]
+                val block = uniqueProposals[position]
                 if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
                     try {
 //                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
