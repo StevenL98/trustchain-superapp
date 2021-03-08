@@ -7,7 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import kotlinx.android.synthetic.main.fragment_join_network.*
+import kotlinx.android.synthetic.main.fragment_shared_wallet_transaction.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -161,6 +163,7 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
         val allUsers = getDemoCommunity().getPeers()
 
         Log.i("Callum","[JoinDAO] users: ${allUsers.size}")
+
 //        Log.i("Coin", "Found ${allUsers.size} peers, crawling")
         for (peer in allUsers) {
             try {

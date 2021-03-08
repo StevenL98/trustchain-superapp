@@ -5,13 +5,14 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import kotlinx.android.synthetic.main.fragment_my_proposals.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
@@ -23,6 +24,8 @@ import nl.tudelft.trustchain.currencyii.ui.BaseFragment
  * create an instance of this fragment.
  */
 class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
+
+
     private var proposals: ArrayList<TrustChainBlock> = ArrayList()
 
     private fun fetchProposalsAndUpdateUI() {
@@ -46,8 +49,11 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                 val block = proposals[position]
                 if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
                     try {
-                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
-                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
+//                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
+//                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
+
+                        val bundle = bundleOf("position" to position)
+                        findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "transfer voting failed: ${t.message ?: "no message"}")
                     }
@@ -93,23 +99,24 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 
         for (peer in allUsers) {
             try {
-                withTimeout(JoinDAOFragment.SW_CRAWLING_TIMEOUT_MILLI) {
-                    trustchain.crawlChain(peer)
-                    val crawlResult = trustchain
-                        .getChainByUser(peer.publicKey.keyToBin())
-                        .filter {
-                            it.type == CoinCommunity.SIGNATURE_ASK_BLOCK ||
-                                it.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK
-                        }
-                    Log.i(
-                        "Coin",
-                        "Crawl result: ${crawlResult.size} proposals found (from ${peer.address})"
-                    )
-                    if (crawlResult.isNotEmpty()) {
-                        updateProposals(crawlResult)
-                        updateProposalListUI()
+                // TODO: Commented this line out, it causes the app to crash
+//                withTimeout(JoinDAOFragment.SW_CRAWLING_TIMEOUT_MILLI) {
+                trustchain.crawlChain(peer)
+                val crawlResult = trustchain
+                    .getChainByUser(peer.publicKey.keyToBin())
+                    .filter {
+                        it.type == CoinCommunity.SIGNATURE_ASK_BLOCK ||
+                            it.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK
                     }
+                Log.i(
+                    "Coin",
+                    "Crawl result: ${crawlResult.size} proposals found (from ${peer.address})"
+                )
+                if (crawlResult.isNotEmpty()) {
+                    updateProposals(crawlResult)
+                    updateProposalListUI()
                 }
+//                }
             } catch (t: Throwable) {
                 val message = t.message ?: "no message"
                 Log.i("Coin", "Crawling failed for: ${peer.address} message: $message")
