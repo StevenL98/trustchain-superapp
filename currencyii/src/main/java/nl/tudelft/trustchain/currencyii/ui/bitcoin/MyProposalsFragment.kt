@@ -48,7 +48,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
             }
             val adaptor = ProposalListAdapter(this, uniqueProposals)
             proposal_list_view.adapter = adaptor
-            val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin()
+//            val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin()
             proposal_list_view.setOnItemClickListener { _, _, position, _ ->
                 val block = uniqueProposals[position]
                 if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
@@ -56,7 +56,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 //                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
 //                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
 
-                        val bundle = bundleOf("position" to position)
+                        val bundle = bundleOf("position" to position, "type" to block.type)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "transfer voting failed: ${t.message ?: "no message"}")
@@ -64,8 +64,10 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                 }
                 if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
                     try {
-                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
-                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
+//                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
+//                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
+                        val bundle = bundleOf("position" to position, "type" to block.type)
+                        findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "join voting failed: ${t.message ?: "no message"}")
                     }
