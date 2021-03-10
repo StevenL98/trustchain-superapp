@@ -10,6 +10,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.widget.ViewPager2
 import com.example.musicdao.MusicBaseFragment
+import com.example.musicdao.MusicService
+import com.example.musicdao.wallet.WalletService
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
@@ -97,6 +99,13 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     viewPager.adapter = tabsAdapter
                     viewPager.currentItem = 1
                     checkIfAllVoted(v)
+
+                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
+                    val result = walletService.signWalletOwner()
+                    if (result) {
+                        findNavController().navigateUp()
+                    }
                 }
                 builder.show()
             }
@@ -147,6 +156,13 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     viewPager.adapter = tabsAdapter
                     viewPager.currentItem = 1
                     checkIfAllVoted(v)
+
+                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
+                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
+                    val result = walletService.signwalletUser()
+                    if (result) {
+                        findNavController().navigateUp()
+                    }
                 }
                 builder.show()
             }

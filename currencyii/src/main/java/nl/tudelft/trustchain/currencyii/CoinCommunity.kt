@@ -212,7 +212,7 @@ class CoinCommunity : Community() {
         )
         return joinProposals
             .union(transferProposals)
-            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex() }
+            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex() && !checkEnoughSignatures(it)}
             .distinctBy { fetchSignatureRequestProposalId(it) }
             .sortedByDescending { it.timestamp }
     }
@@ -261,6 +261,36 @@ class CoinCommunity : Community() {
             .SW_TRANSACTION_SERIALIZED
 
         DAOTransferFundsHelper.transferFundsBlockReceived(oldTransaction, block, myPublicKey)
+    }
+
+    /**
+     * Given a proposal, check if the number of signatures required is met
+     */
+    fun checkEnoughSignatures(block: TrustChainBlock): Boolean {
+        if (block.type == SIGNATURE_ASK_BLOCK) {
+            val data = SWSignatureAskTransactionData(block.transaction).getData()
+            val signatures =
+                ArrayList(
+                    fetchProposalSignatures(
+                        data.SW_UNIQUE_ID,
+                        data.SW_UNIQUE_PROPOSAL_ID
+                    )
+                )
+            return data.SW_SIGNATURES_REQUIRED <= signatures.size
+        }
+        if (block.type == TRANSFER_FUNDS_ASK_BLOCK) {
+            val data = SWTransferFundsAskTransactionData(block.transaction).getData()
+            val signatures =
+                ArrayList(
+                    fetchProposalSignatures(
+                        data.SW_UNIQUE_ID,
+                        data.SW_UNIQUE_PROPOSAL_ID
+                    )
+                )
+            return data.SW_SIGNATURES_REQUIRED <= signatures.size
+        }
+
+        return false
     }
 
     companion object {

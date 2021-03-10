@@ -172,7 +172,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
     }
 
 
-    fun signUser1() : Boolean {
+    fun signWalletOwner() : Boolean {
         // serverside
         val multisigOutput = currentTransaction.getOutput(0)
         val multisigScript = multisigOutput.scriptPubKey
@@ -200,7 +200,7 @@ class WalletService(val walletDir: File, private val musicService: MusicService)
         return verifyTransaction()
     }
 
-    fun signUser2(): Boolean{
+    fun signwalletUser(): Boolean{
         // serverside
         val multisigOutput = currentTransaction.getOutput(0)
         val multisigScript = multisigOutput.scriptPubKey

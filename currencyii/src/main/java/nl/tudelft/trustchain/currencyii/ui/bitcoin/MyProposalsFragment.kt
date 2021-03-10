@@ -16,6 +16,9 @@ import kotlinx.coroutines.withContext
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskTransactionData
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWTransferFundsAskTransactionData
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 
 /**
@@ -42,7 +45,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 
     private fun updateProposalListUI() {
         activity?.runOnUiThread {
-            var uniqueProposals:ArrayList<TrustChainBlock> = ArrayList()
+            val uniqueProposals: ArrayList<TrustChainBlock> = ArrayList()
             for (proposal in proposals) {
                 if (!uniqueProposals.contains(proposal)) uniqueProposals.add(proposal)
             }
@@ -66,6 +69,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                     try {
 //                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
 //                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
+
                         val bundle = bundleOf("position" to position, "type" to block.type)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
