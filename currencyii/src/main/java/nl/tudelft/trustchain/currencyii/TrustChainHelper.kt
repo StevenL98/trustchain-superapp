@@ -1,10 +1,12 @@
 package nl.tudelft.trustchain.currencyii
 
+import android.util.Log
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.attestation.trustchain.store.UserInfo
+import nl.tudelft.ipv8.util.toHex
 
 /**
  * A helper class for interacting with TrustChain.
@@ -76,5 +78,14 @@ class TrustChainHelper(
      */
     fun getChainByUser(publicKeyBin: ByteArray): List<TrustChainBlock> {
         return trustChainCommunity.database.getMutualBlocks(publicKeyBin, 1000)
+    }
+
+    /**
+     * Returns the JOIN blocks of the specified user for the receiver to see.
+     */
+    fun getUserJoinBlocks() : List<TrustChainBlock> {
+        val blocks = trustChainCommunity.database.getBlocksWithType("v1DAO_JOIN")
+        Log.i("Callum", "[TrustChainHelper] Blocks: ${blocks.size}")
+        return blocks
     }
 }
