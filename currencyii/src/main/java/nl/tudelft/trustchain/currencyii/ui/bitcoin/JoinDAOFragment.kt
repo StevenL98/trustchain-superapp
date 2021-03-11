@@ -161,9 +161,6 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
 
         for (peer in allUsers) {
             try {
-                trustchain.crawlChain(peer)
-                val crawlResult = trustchain
-                        .getChainByUser(peer.publicKey.keyToBin()).toSet()
                 val wallets = trustchain.getUserJoinBlocks().distinctBy { parseTransactionDataGetWalletId(it.transaction) }.toSet()
                 updateSharedWallets(wallets)
             } catch (t: Throwable) {
