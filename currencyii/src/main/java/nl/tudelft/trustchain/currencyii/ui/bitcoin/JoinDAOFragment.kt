@@ -15,12 +15,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
+import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
+import org.json.JSONObject
 
 /**
  * A simple [Fragment] subclass.
@@ -35,7 +37,7 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         initListeners()
-        this.refresh()
+//        this.refresh()
     }
 
     private fun initListeners() {
@@ -78,10 +80,10 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 setAlertText("Crawling blocks for DAOs...")
-
+                Log.i("Callum", "Testing the logging")
                 val discoveredWallets = getCoinCommunity().discoverSharedWallets().toSet()
                 updateSharedWallets(discoveredWallets)
-                updateSharedWalletsUI()
+//                updateSharedWalletsUI()
                 crawlAvailableSharedWallets()
                 updateSharedWalletsUI()
 
@@ -109,7 +111,6 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
             }
 
         Log.i("Coin", "${distinctById.size} unique wallets founds. Adding if not present already.")
-        Log.i("Callum", "[JoinDAO] Distinct by id size: ${distinctById.size}")
         for (wallet in distinctById) {
             val currentId = SWJoinBlockTransactionData(wallet.transaction).getData().SW_UNIQUE_ID
             if (!walletIds.contains(currentId)) {
@@ -125,11 +126,9 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
     private fun updateSharedWalletsUI() {
         lifecycleScope.launchWhenStarted {
             val publicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
-
-//            Log.i("Callum", "[JoinDAO] checking fetched wallet for duplicates: ${fetchedWallets}")
             var uniqueWallets: ArrayList<TrustChainBlock> = ArrayList()
-            for (wallet in fetchedWallets) {
-                if (!uniqueWallets.contains(wallet)) uniqueWallets.add(wallet)
+            for (wallet in fetchedWallets.toSet()) {
+                uniqueWallets.add(wallet)
             }
             // Update the list view with the found shared wallets
             adapter = SharedWalletListAdapter(
@@ -160,25 +159,34 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
      * Crawl all shared wallet blocks of users in the trust chain.
      */
     private suspend fun crawlAvailableSharedWallets() {
-        val allUsers = getDemoCommunity().getPeers()
+        val allUsers = getTrustChainCommunity().getPeers()
 
         Log.i("Callum","[JoinDAO] users: ${allUsers.size}")
-
-//        Log.i("Coin", "Found ${allUsers.size} peers, crawling")
         for (peer in allUsers) {
             try {
                 trustchain.crawlChain(peer)
-                val crawlResult = trustchain
-                        .getChainByUser(peer.publicKey.keyToBin()).toSet()
-                updateSharedWallets(crawlResult)
-                for (crawl in crawlResult) {
-//                    Log.i("Callum", "[JoinDAO] crawl: ${crawl.blockId}")
+                Log.i("Callum", "[JoinDAO] Peer: ${peer.publicKey.keyToBin().toHex()}")
+//                val crawlResult = trustchain
+//                        .getChainByUser(peer.publicKey.keyToBin()).toSet()
+                val wallets = trustchain.getUserJoinBlocks().distinctBy { parseTransactionDataGetWalletId(it.transaction) }.toSet()
+                Log.i("Callum", "[JoinDAO] Wallet size of my method: ${wallets.size}")
+                for (wallet in wallets) {
+                   Log.i("Callum", "[JoinDAO] Peer: ${peer.publicKey.keyToBin().toHex()} WalletID: ${parseTransactionDataGetWalletId(wallet.transaction)}")
                 }
+                updateSharedWallets(wallets)
+//                updateSharedWallets(crawlResult)
+//                for (crawl in crawlResult) {
+//                    if (crawl.type.contains("v1DAO_JOIN")) {
+//                        val transaction = crawl.transaction["message"].toString()
+//                        val transactionObj = JSONObject(transaction.substring(transaction.indexOf("{"), transaction.lastIndexOf("}") + 1))
+//                        Log.i("Callum", "[JoinDAO] crawl: ${transactionObj["SW_UNIQUE_ID"]}")
+//                    }
+//                }
 
-                val gtc = getTrustChainCommunity()
+
 //                val db = gtc.database
 
-                Log.i("Callum", "[JoinDAO] trustchain community: ${gtc.toString()}")
+
 //                val lsw = getCoinCommunity().discoverSharedWallets()
 //                val swBlocks = getTrustChainCommunity().database.getBlo
 //                val publicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
@@ -198,6 +206,11 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
         disableRefresher()
     }
 
+    fun parseTransactionDataGetWalletId(trans:TrustChainTransaction) : String {
+        val transaction = trans["message"].toString()
+        val transactionObj = JSONObject(transaction.substring(transaction.indexOf("{"), transaction.lastIndexOf("}") + 1))
+        return transactionObj["SW_UNIQUE_ID"].toString()
+    }
     /**
      * Join a shared bitcoin wallet.
      */
