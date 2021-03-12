@@ -212,7 +212,7 @@ class CoinCommunity : Community() {
         )
         return joinProposals
             .union(transferProposals)
-            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex() && !checkEnoughSignatures(it)}
+            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex()}
             .distinctBy { fetchSignatureRequestProposalId(it) }
             .sortedByDescending { it.timestamp }
     }
@@ -232,12 +232,25 @@ class CoinCommunity : Community() {
             }
     }
 
+    public fun fetchNegativeProposalSignatures(walletId: String, proposalId: String): List<String> {
+        return getTrustChainCommunity().database.getBlocksWithType(
+            SIGNATURE_AGREEMENT_NEGATIVE_BLOCK)
+            .filter {
+                val blockData = SWResponseNegativeSignatureTransactionData(it.transaction)
+                blockData.matchesProposal(walletId, proposalId)
+            }.map {
+                val blockData = SWResponseNegativeSignatureTransactionData(it.transaction).getData()
+                blockData.SW_SIGNATURE_SERIALIZED
+            }
+    }
+
     /**
      * Given a shared wallet proposal block, calculate the signature and respond with a trust chain block.
      */
     public fun joinAskBlockReceived(
         block: TrustChainBlock,
-        myPublicKey: ByteArray
+        myPublicKey: ByteArray,
+        votedInFavor: Boolean
     ) {
         val latestHash = SWSignatureAskTransactionData(block.transaction).getData()
             .SW_PREVIOUS_BLOCK_HASH
@@ -246,7 +259,7 @@ class CoinCommunity : Community() {
         val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
             .SW_TRANSACTION_SERIALIZED
 
-        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, myPublicKey)
+        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, myPublicKey, votedInFavor)
     }
 
     /**
@@ -318,5 +331,8 @@ class CoinCommunity : Community() {
 
         // Block type for responding to a signature request with a (should be valid) signature
         public const val SIGNATURE_AGREEMENT_BLOCK = "v1DAO_SIGNATURE_AGREEMENT"
+
+        // Block type for responding with a negative vote to a signature request with a signature
+        public const val SIGNATURE_AGREEMENT_NEGATIVE_BLOCK = "v1DAO_SIGNATURE_AGREEMENT_NEGATIVE"
     }
 }

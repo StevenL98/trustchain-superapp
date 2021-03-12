@@ -59,7 +59,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 //                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
 //                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
 
-                        val bundle = bundleOf("position" to position, "type" to block.type)
+                        val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "transfer voting failed: ${t.message ?: "no message"}")
@@ -70,7 +70,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 //                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
 //                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
 
-                        val bundle = bundleOf("position" to position, "type" to block.type)
+                        val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "join voting failed: ${t.message ?: "no message"}")
