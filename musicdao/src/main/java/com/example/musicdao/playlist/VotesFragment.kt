@@ -26,8 +26,7 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
     private val TAB_NAMES = arrayOf("Upvotes", "Downvotes", "Undecided votes")
 
     // initialize voters with 0 pro, 0 against and 2 undecided votes
-    private val voters =
-        hashMapOf(0 to arrayListOf(), 1 to arrayListOf(), 2 to arrayListOf("User1", "User2"))
+    private var voters: Array<ArrayList<String>> = arrayOf(ArrayList(), ArrayList(), arrayListOf("User1", "User2"))
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -51,9 +50,9 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
 
             view.findViewById<TextView>(R.id.title).text = artists
             view.findViewById<TextView>(R.id.price).text = getString(R.string.bounty_payout, price, artists)
-            val favorVotes = voters[0]!!.size
-            val againstVotes = voters[1]!!.size
-            val undecidedVotes = voters[2]!!.size
+            val favorVotes = voters[0].size
+            val againstVotes = voters[1].size
+            val undecidedVotes = voters[2].size
             view.findViewById<ExtendedFloatingActionButton>(R.id.fab_user).setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
                 builder.setTitle(getString(R.string.bounty_payout, price, artists))
@@ -75,8 +74,8 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                             artists
                         ), Toast.LENGTH_SHORT
                     ).show()
-                    voters[0]!!.add("User1")
-                    voters[2]!!.remove("User1")
+                    voters[0].add("User1")
+                    voters[2].remove("User1")
                     userHasAlreadyVoted(view)
                     tabsAdapter = TabsAdapter(this, voters)
                     viewPager.adapter = tabsAdapter
@@ -92,8 +91,8 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                             artists
                         ), Toast.LENGTH_SHORT
                     ).show()
-                    voters[1]!!.add("User1")
-                    voters[2]!!.remove("User1")
+                    voters[1].add("User1")
+                    voters[2].remove("User1")
                     userHasAlreadyVoted(view)
                     tabsAdapter = TabsAdapter(this, voters)
                     viewPager.adapter = tabsAdapter
@@ -132,8 +131,8 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                             artists
                         ), Toast.LENGTH_SHORT
                     ).show()
-                    voters[0]!!.add("User2")
-                    voters[2]!!.remove("User2")
+                    voters[0].add("User2")
+                    voters[2].remove("User2")
                     view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
                     tabsAdapter = TabsAdapter(this, voters)
                     viewPager.adapter = tabsAdapter
@@ -149,8 +148,8 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                             artists
                         ), Toast.LENGTH_SHORT
                     ).show()
-                    voters[1]!!.add("User2")
-                    voters[2]!!.remove("User2")
+                    voters[1].add("User2")
+                    voters[2].remove("User2")
                     view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
                     tabsAdapter = TabsAdapter(this, voters)
                     viewPager.adapter = tabsAdapter
@@ -179,7 +178,7 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
     }
 
     private fun checkIfAllVoted(v: View) {
-        if (voters[2]!!.size == 0) {
+        if (voters[2].size == 0) {
             Toast.makeText(
                 v.context,
                 getString(R.string.bounty_payout_all_voted),

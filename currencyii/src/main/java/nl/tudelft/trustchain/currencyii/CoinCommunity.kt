@@ -212,7 +212,7 @@ class CoinCommunity : Community() {
         )
         return joinProposals
             .union(transferProposals)
-            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex()}
+            .filter { fetchSignatureRequestReceiver(it) == myPeer.publicKey.keyToBin().toHex() && !checkEnoughFavorSignatures(it)}
             .distinctBy { fetchSignatureRequestProposalId(it) }
             .sortedByDescending { it.timestamp }
     }
@@ -232,6 +232,10 @@ class CoinCommunity : Community() {
             }
     }
 
+    /**
+     * Fetch all DAO blocks that contain a negative signature. These blocks are the response of a negative signature request.
+     * Signatures are fetched from [SIGNATURE_AGREEMENT_NEGATIVE_BLOCK] type blocks.
+     */
     public fun fetchNegativeProposalSignatures(walletId: String, proposalId: String): List<String> {
         return getTrustChainCommunity().database.getBlocksWithType(
             SIGNATURE_AGREEMENT_NEGATIVE_BLOCK)
@@ -265,7 +269,7 @@ class CoinCommunity : Community() {
     /**
      * Given a shared wallet transfer fund proposal block, calculate the signature and respond with a trust chain block.
      */
-    public fun transferFundsBlockReceived(block: TrustChainBlock, myPublicKey: ByteArray) {
+    public fun transferFundsBlockReceived(block: TrustChainBlock, myPublicKey: ByteArray, votedInFavor: Boolean) {
         val latestHash = SWTransferFundsAskTransactionData(block.transaction).getData()
             .SW_PREVIOUS_BLOCK_HASH
         val mostRecentSWBlock = fetchLatestSharedWalletBlock(latestHash.hexToBytes())
@@ -273,13 +277,13 @@ class CoinCommunity : Community() {
         val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
             .SW_TRANSACTION_SERIALIZED
 
-        DAOTransferFundsHelper.transferFundsBlockReceived(oldTransaction, block, myPublicKey)
+        DAOTransferFundsHelper.transferFundsBlockReceived(oldTransaction, block, myPublicKey, votedInFavor)
     }
 
     /**
      * Given a proposal, check if the number of signatures required is met
      */
-    fun checkEnoughSignatures(block: TrustChainBlock): Boolean {
+    fun checkEnoughFavorSignatures(block: TrustChainBlock): Boolean {
         if (block.type == SIGNATURE_ASK_BLOCK) {
             val data = SWSignatureAskTransactionData(block.transaction).getData()
             val signatures =
