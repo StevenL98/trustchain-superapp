@@ -51,14 +51,10 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
             }
             val adaptor = ProposalListAdapter(this, uniqueProposals)
             proposal_list_view.adapter = adaptor
-//            val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin()
             proposal_list_view.setOnItemClickListener { _, _, position, _ ->
                 val block = uniqueProposals[position]
                 if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
                     try {
-//                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
-//                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
-
                         val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
@@ -67,9 +63,6 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                 }
                 if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
                     try {
-//                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
-//                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
-
                         val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {

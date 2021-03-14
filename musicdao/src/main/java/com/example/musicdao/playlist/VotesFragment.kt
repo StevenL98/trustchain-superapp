@@ -49,7 +49,7 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
             val userHasVoted = false
 
             view.findViewById<TextView>(R.id.title).text = artists
-            view.findViewById<TextView>(R.id.price).text = getString(R.string.bounty_payout, price, artists)
+            view.findViewById<TextView>(R.id.sub_title).text = getString(R.string.bounty_payout, price, artists)
             val favorVotes = voters[0].size
             val againstVotes = voters[1].size
             val undecidedVotes = voters[2].size
