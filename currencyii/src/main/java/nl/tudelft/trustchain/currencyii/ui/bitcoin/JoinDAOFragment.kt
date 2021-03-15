@@ -158,9 +158,13 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
      */
     private suspend fun crawlAvailableSharedWallets() {
         val allUsers = getTrustChainCommunity().getPeers()
+        val gtc = getTrustChainCommunity()
 
+        val mpk = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
         for (peer in allUsers) {
             try {
+                val pk = peer.publicKey.keyToBin().toHex()
+
                 val wallets = trustchain.getUserJoinBlocks().distinctBy { parseTransactionDataGetWalletId(it.transaction) }.toSet()
                 updateSharedWallets(wallets)
             } catch (t: Throwable) {

@@ -85,7 +85,6 @@ class TrustChainHelper(
      */
     fun getUserJoinBlocks() : List<TrustChainBlock> {
         val blocks = trustChainCommunity.database.getBlocksWithType("v1DAO_JOIN")
-        Log.i("Callum", "[TrustChainHelper] Blocks: ${blocks.size}")
         return blocks
     }
 }
