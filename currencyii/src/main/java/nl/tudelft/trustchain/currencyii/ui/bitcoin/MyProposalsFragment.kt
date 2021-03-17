@@ -16,9 +16,6 @@ import kotlinx.coroutines.withContext
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
-import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
-import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskTransactionData
-import nl.tudelft.trustchain.currencyii.sharedWallet.SWTransferFundsAskTransactionData
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 
 /**
@@ -46,7 +43,9 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
     private fun updateProposalListUI() {
         activity?.runOnUiThread {
             val uniqueProposals: ArrayList<TrustChainBlock> = ArrayList()
-            for (proposal in proposals) {
+            val proposalCopy = arrayListOf<TrustChainBlock>()
+            proposalCopy.addAll(proposals)
+            for (proposal in proposalCopy) {
                 if (!uniqueProposals.contains(proposal)) uniqueProposals.add(proposal)
             }
             val adaptor = ProposalListAdapter(this, uniqueProposals)
