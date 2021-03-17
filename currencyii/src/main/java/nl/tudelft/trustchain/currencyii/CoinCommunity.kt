@@ -180,7 +180,7 @@ class CoinCommunity : Community() {
         }
     }
 
-    fun fetchSignatureRequestReceiver(block: TrustChainBlock): String {
+    private fun fetchSignatureRequestReceiver(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
             return SWSignatureAskTransactionData(block.transaction).getData().SW_RECEIVER_PK
         }
