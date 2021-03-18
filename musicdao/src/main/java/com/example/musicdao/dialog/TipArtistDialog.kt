@@ -43,19 +43,19 @@ class TipArtistDialog(private val publicKey: String, private val artists: String
         val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
 
         builder.setView(dialogView)
-            .setPositiveButton("Confirm", DialogInterface.OnClickListener { _, _ ->
+            .setPositiveButton("Confirm") { _, _ ->
                 val amount = amountEditText?.text.toString()
                 walletService.createProposal(publicKey, amount)
                 val action =
                     PlaylistsOverviewFragmentDirections.actionPlaylistsOverviewFragmentToVotesFragment(
                         artists,
                         amount
-                    );
+                    )
                 findNavController().navigateUp()
                 findNavController().navigate(action)
-            }).setNegativeButton("Cancel", DialogInterface.OnClickListener { _, _ ->
+            }.setNegativeButton("Cancel") { _, _ ->
                 dialog?.cancel()
-            })
+            }
 
         return builder.create()
     }
