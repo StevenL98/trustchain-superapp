@@ -101,21 +101,21 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
             try {
                 // TODO: Commented this line out, it causes the app to crash
 //                withTimeout(JoinDAOFragment.SW_CRAWLING_TIMEOUT_MILLI) {
-                    trustchain.crawlChain(peer)
-                    val crawlResult = trustchain
-                        .getChainByUser(peer.publicKey.keyToBin())
-                        .filter {
-                            it.type == CoinCommunity.SIGNATURE_ASK_BLOCK ||
-                                it.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK
-                        }
-                    Log.i(
-                        "Coin",
-                        "Crawl result: ${crawlResult.size} proposals found (from ${peer.address})"
-                    )
-                    if (crawlResult.isNotEmpty()) {
-                        updateProposals(crawlResult)
-                        updateProposalListUI()
+                trustchain.crawlChain(peer)
+                val crawlResult = trustchain
+                    .getChainByUser(peer.publicKey.keyToBin())
+                    .filter {
+                        it.type == CoinCommunity.SIGNATURE_ASK_BLOCK ||
+                            it.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK
                     }
+                Log.i(
+                    "Coin",
+                    "Crawl result: ${crawlResult.size} proposals found (from ${peer.address})"
+                )
+                if (crawlResult.isNotEmpty()) {
+                    updateProposals(crawlResult)
+                    updateProposalListUI()
+                }
 //                }
             } catch (t: Throwable) {
                 val message = t.message ?: "no message"
