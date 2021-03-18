@@ -56,24 +56,20 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
             view.findViewById<ExtendedFloatingActionButton>(R.id.fab_user).setOnClickListener { v ->
                 val builder = AlertDialog.Builder(v.context)
                 builder.setTitle(getString(R.string.bounty_payout, price, artists))
-                builder.setMessage(
-                    getString(
+                builder.setMessage(getString(
                         R.string.bounty_payout_message,
                         price,
                         artists,
                         favorVotes,
                         againstVotes,
                         undecidedVotes
-                    )
-                )
+                    ))
                 builder.setPositiveButton("YES") { _, _ ->
-                    Toast.makeText(
-                        v.context, getString(
+                    Toast.makeText(v.context, getString(
                             R.string.bounty_payout_upvoted,
                             price,
                             artists
-                        ), Toast.LENGTH_SHORT
-                    ).show()
+                        ), Toast.LENGTH_SHORT).show()
                     voters[0].add("User1")
                     voters[2].remove("User1")
                     userHasAlreadyVoted(view)
@@ -84,13 +80,11 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                 }
 
                 builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(
-                        v.context, getString(
+                    Toast.makeText(v.context, getString(
                             R.string.bounty_payout_downvoted,
                             price,
                             artists
-                        ), Toast.LENGTH_SHORT
-                    ).show()
+                        ), Toast.LENGTH_SHORT).show()
                     voters[1].add("User1")
                     voters[2].remove("User1")
                     userHasAlreadyVoted(view)
@@ -102,63 +96,6 @@ class VotesFragment : MusicBaseFragment(R.layout.fragment_votes) {
                     val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
                     val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
                     val result = walletService.signWalletOwner()
-                    if (result) {
-                        findNavController().navigateUp()
-                    }
-                }
-                builder.show()
-            }
-
-            // FOR THE DEMO TOMORROW
-            view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).setOnClickListener { v ->
-                val builder = AlertDialog.Builder(v.context)
-                builder.setTitle(getString(R.string.bounty_payout, price, artists))
-                builder.setMessage(
-                    getString(
-                        R.string.bounty_payout_message,
-                        price,
-                        artists,
-                        favorVotes,
-                        againstVotes,
-                        undecidedVotes
-                    )
-                )
-                builder.setPositiveButton("YES") { _, _ ->
-                    Toast.makeText(
-                        v.context, getString(
-                            R.string.bounty_payout_upvoted,
-                            price,
-                            artists
-                        ), Toast.LENGTH_SHORT
-                    ).show()
-                    voters[0].add("User2")
-                    voters[2].remove("User2")
-                    view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
-                    tabsAdapter = TabsAdapter(this, voters)
-                    viewPager.adapter = tabsAdapter
-                    viewPager.currentItem = 0
-                    checkIfAllVoted(v)
-                }
-
-                builder.setNeutralButton("NO") { _, _ ->
-                    Toast.makeText(
-                        v.context, getString(
-                            R.string.bounty_payout_downvoted,
-                            price,
-                            artists
-                        ), Toast.LENGTH_SHORT
-                    ).show()
-                    voters[1].add("User2")
-                    voters[2].remove("User2")
-                    view.findViewById<ExtendedFloatingActionButton>(R.id.fab_demo).visibility = View.GONE
-                    tabsAdapter = TabsAdapter(this, voters)
-                    viewPager.adapter = tabsAdapter
-                    viewPager.currentItem = 1
-                    checkIfAllVoted(v)
-
-                    val walletDir = context?.cacheDir ?: throw Error("CacheDir not found")
-                    val walletService = WalletService.getInstance(walletDir, (activity as MusicService))
-                    val result = walletService.signwalletUser()
                     if (result) {
                         findNavController().navigateUp()
                     }
