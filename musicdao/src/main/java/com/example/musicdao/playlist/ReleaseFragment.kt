@@ -224,7 +224,7 @@ class ReleaseFragment(
             tipButton.visibility = View.VISIBLE
             tipButton.isClickable = true
             tipButton.setOnClickListener {
-                TipArtistDialog(publisher, artists)
+                TipArtistDialog(publisher)
                     .show(childFragmentManager, "Tip the artist")
             }
         }
