@@ -46,7 +46,6 @@ class TrustChainApplication : Application() {
         super.onCreate()
 
         defaultCryptoProvider = AndroidCryptoProvider
-
         initIPv8()
     }
 

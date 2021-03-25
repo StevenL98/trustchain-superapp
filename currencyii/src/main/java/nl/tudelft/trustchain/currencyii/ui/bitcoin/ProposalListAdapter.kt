@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.TextView
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
+import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskTransactionData
@@ -30,25 +31,56 @@ class ProposalListAdapter(
         val signaturesRequired = view.findViewById<TextView>(R.id.signatures_required_tv)
         val transferReceiver = view.findViewById<TextView>(R.id.transfer_target_tv)
         val transferAmount = view.findViewById<TextView>(R.id.transfer_amount_tv)
+        val votedButton = view.findViewById<TextView>(R.id.voted_button)
 
         if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
             val data = SWTransferFundsAskTransactionData(block.transaction).getData()
+            // Get favor votes
+            val signatures = ArrayList(context.getCoinCommunity().fetchProposalSignatures(data.SW_UNIQUE_ID, data.SW_UNIQUE_PROPOSAL_ID))
+            // Get against votes
+            val negativeSignatures = ArrayList(context.getCoinCommunity().fetchNegativeProposalSignatures(data.SW_UNIQUE_ID, data.SW_UNIQUE_PROPOSAL_ID))
+
+            // Check if I voted
+            val mySignatureSerialized = context.getCoinCommunity().getMySignatureTransaction(data).encodeToDER().toHex()
+            if (signatures.contains(mySignatureSerialized) || negativeSignatures.contains(mySignatureSerialized)) {
+                votedButton.visibility = View.VISIBLE
+            }
+
+            // If the proposal can't be met anymore, draw a red border
+            if (!context.getCoinCommunity().canWinTransferRequest(data)) {
+                view.setBackgroundResource(R.drawable.border)
+            }
+
             about.text = "Transfer funds request"
             createdAt.text = formatter.format(block.timestamp)
             doaId.text = data.SW_UNIQUE_ID
             proposalId.text = data.SW_UNIQUE_PROPOSAL_ID
-            signaturesRequired.text = data.SW_SIGNATURES_REQUIRED.toString()
+            signaturesRequired.text = "${signatures.size}/${data.SW_SIGNATURES_REQUIRED}"
             transferReceiver.text = data.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
             transferAmount.text = "${data.SW_TRANSFER_FUNDS_AMOUNT} Satoshi"
-        }
-
-        if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
+        } else if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
             val data = SWSignatureAskTransactionData(block.transaction).getData()
+            // Get favor votes
+            val signatures = ArrayList(context.getCoinCommunity().fetchProposalSignatures(data.SW_UNIQUE_ID, data.SW_UNIQUE_PROPOSAL_ID))
+            // Get against votes
+            val negativeSignatures = ArrayList(context.getCoinCommunity().fetchNegativeProposalSignatures(data.SW_UNIQUE_ID, data.SW_UNIQUE_PROPOSAL_ID))
+
+            // Check if I voted
+            val mySignatureSerialized = context.getCoinCommunity().getMySignatureJoinRequest(data).encodeToDER().toHex()
+            if (signatures.contains(mySignatureSerialized) || negativeSignatures.contains(mySignatureSerialized)) {
+                votedButton.visibility = View.VISIBLE
+            }
+
+            // If the proposal can't be met anymore, draw a red border
+            if (!context.getCoinCommunity().canWinJoinRequest(data)) {
+                view.setBackgroundResource(R.drawable.border)
+            }
+
             about.text = "Join request"
             createdAt.text = formatter.format(block.timestamp)
             doaId.text = data.SW_UNIQUE_ID
             proposalId.text = data.SW_UNIQUE_PROPOSAL_ID
-            signaturesRequired.text = "${data.SW_SIGNATURES_REQUIRED}"
+            signaturesRequired.text = "${signatures.size}/${data.SW_SIGNATURES_REQUIRED}"
 
             // Hide the components only used for transfer funds
             hideTransferProposalComponents(view)
