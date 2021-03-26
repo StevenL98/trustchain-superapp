@@ -175,19 +175,11 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
 
         walletBalance.text = walletManager.kit.wallet().balance.toFriendlyString()
         walletEstimatedBalance.text = walletManager.kit.wallet().getBalance(Wallet.BalanceType.ESTIMATED).toFriendlyString()
-        when {
-            walletManager.params.id === NetworkParameters.ID_MAINNET -> {
-                chosenNetwork.text = "Production Network"
-            }
-            walletManager.params.id === NetworkParameters.ID_REGTEST -> {
-                chosenNetwork.text = "RegTest Network"
-            }
-            walletManager.params.id === NetworkParameters.ID_TESTNET -> {
-                chosenNetwork.text = "TestNet Network"
-            }
-            else -> {
-                chosenNetwork.text = "Unknown Network selected"
-            }
+        chosenNetwork.text = when (walletManager.params.id) {
+            NetworkParameters.ID_MAINNET -> "Production Network"
+            NetworkParameters.ID_REGTEST -> "RegTest Network"
+            NetworkParameters.ID_TESTNET -> "TestNet Network"
+            else -> "Unknown Network selected"
         }
         val seed = walletManager.toSeed()
         walletSeed.text = "${seed.seed}, ${seed.creationTime}"
@@ -258,7 +250,7 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
                     R.id.testnet_radiobutton -> BitcoinNetworkOptions.TEST_NET
                     R.id.regtest_radiobutton -> BitcoinNetworkOptions.REG_TEST
                     else -> {
-                        Toast.makeText(this.requireContext(),"Please select a bitcoin network first",Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this.requireContext(), "Please select a bitcoin network first", Toast.LENGTH_SHORT).show()
                         return
                     }
                 },
