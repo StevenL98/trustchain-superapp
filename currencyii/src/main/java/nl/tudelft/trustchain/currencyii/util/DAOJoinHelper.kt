@@ -36,7 +36,7 @@ class DAOJoinHelper {
      * **NOTE** the latest walletBlockData should be given, otherwise the serialized transaction is invalid.
      * @param mostRecentWalletBlock - the latest (that you know of) shared wallet block.
      */
-    public fun proposeJoinWallet(
+    fun proposeJoinWallet(
         myPeer: Peer,
         mostRecentWalletBlock: TrustChainBlock
     ): SWSignatureAskTransactionData {
@@ -50,12 +50,15 @@ class DAOJoinHelper {
         val requiredSignatures =
             SWUtil.percentageToIntThreshold(total, blockData.SW_VOTING_THRESHOLD)
 
+        val proposalID = SWUtil.randomUUID()
+
         var askSignatureBlockData = SWSignatureAskTransactionData(
             blockData.SW_UNIQUE_ID,
             serializedTransaction,
             mostRecentBlockHash,
             requiredSignatures,
-            ""
+            "",
+            proposalID
         )
 
         for (swParticipantPk in blockData.SW_TRUSTCHAIN_PKS) {
@@ -68,7 +71,8 @@ class DAOJoinHelper {
                 serializedTransaction,
                 mostRecentBlockHash,
                 requiredSignatures,
-                swParticipantPk
+                swParticipantPk,
+                proposalID
             )
 
             trustchain.createProposalBlock(
@@ -187,7 +191,8 @@ class DAOJoinHelper {
         fun joinAskBlockReceived(
             oldTransactionSerialized: String,
             block: TrustChainBlock,
-            myPublicKey: ByteArray
+            myPublicKey: ByteArray,
+            votedInFavor: Boolean
         ) {
             val trustchain = TrustChainHelper(IPv8Android.getInstance().getOverlay() ?: return)
 
@@ -212,17 +217,31 @@ class DAOJoinHelper {
                 walletManager.protocolECKey()
             )
             val signatureSerialized = signature.encodeToDER().toHex()
-            val agreementData = SWResponseSignatureTransactionData(
-                blockData.SW_UNIQUE_ID,
-                blockData.SW_UNIQUE_PROPOSAL_ID,
-                signatureSerialized
-            )
+            if (votedInFavor) {
+                val agreementData = SWResponseSignatureTransactionData(
+                    blockData.SW_UNIQUE_ID,
+                    blockData.SW_UNIQUE_PROPOSAL_ID,
+                    signatureSerialized
+                )
 
-            trustchain.createProposalBlock(
-                agreementData.getTransactionData(),
-                myPublicKey,
-                agreementData.blockType
-            )
+                trustchain.createProposalBlock(
+                    agreementData.getTransactionData(),
+                    myPublicKey,
+                    agreementData.blockType
+                )
+            } else {
+                val negativeResponseData = SWResponseNegativeSignatureTransactionData(
+                    blockData.SW_UNIQUE_ID,
+                    blockData.SW_UNIQUE_PROPOSAL_ID,
+                    signatureSerialized
+                )
+
+                trustchain.createProposalBlock(
+                    negativeResponseData.getTransactionData(),
+                    myPublicKey,
+                    negativeResponseData.blockType
+                )
+            }
         }
     }
 }

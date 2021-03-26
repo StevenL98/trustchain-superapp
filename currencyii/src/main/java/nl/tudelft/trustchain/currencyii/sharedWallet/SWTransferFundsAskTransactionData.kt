@@ -31,7 +31,7 @@ class SWTransferFundsAskTransactionData(data: JsonObject) : SWBlockTransactionDa
         bitcoinPks: List<String>,
         transferFundsAddressSerialized: String,
         receiverPk: String,
-        uniqueProposalId: String = SWUtil.randomUUID()
+        uniqueProposalId: String
     ) : this(
         SWUtil.objectToJsonObject(
             SWTransferFundsAskBlockTD(

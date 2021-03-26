@@ -5,8 +5,10 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import kotlinx.android.synthetic.main.fragment_my_proposals.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,21 +48,20 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
             }
             val adaptor = ProposalListAdapter(this, uniqueProposals)
             proposal_list_view.adapter = adaptor
-            val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin()
             proposal_list_view.setOnItemClickListener { _, _, position, _ ->
                 val block = uniqueProposals[position]
                 if (block.type == CoinCommunity.TRANSFER_FUNDS_ASK_BLOCK) {
                     try {
-                        Log.i("Coin", "Voted yes on transferring funds of: ${block.transaction}")
-                        getCoinCommunity().transferFundsBlockReceived(block, myPublicKey)
+                        val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
+                        findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "transfer voting failed: ${t.message ?: "no message"}")
                     }
                 }
                 if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
                     try {
-                        Log.i("Coin", "Voted yes on joining of: ${block.transaction}")
-                        getCoinCommunity().joinAskBlockReceived(block, myPublicKey)
+                        val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
+                        findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
                         Log.i("Coin", "join voting failed: ${t.message ?: "no message"}")
                     }
