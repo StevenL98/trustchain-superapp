@@ -2,6 +2,8 @@ package nl.tudelft.trustchain.currencyii.ui.bitcoin
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.graphics.Color
+import android.graphics.PorterDuff
 import android.os.Bundle
 import android.os.Handler
 import android.util.Log
@@ -10,15 +12,19 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat.getSystemService
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import kotlinx.android.synthetic.main.bitcoin_networks.*
 import kotlinx.android.synthetic.main.fragment_bitcoin.*
 import nl.tudelft.trustchain.currencyii.R
-import nl.tudelft.trustchain.currencyii.coin.AddressPrivateKeyPair
-import nl.tudelft.trustchain.currencyii.coin.BitcoinNetworkOptions
-import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
-import nl.tudelft.trustchain.currencyii.coin.WalletManagerConfiguration
+import nl.tudelft.trustchain.currencyii.coin.*
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
+import org.bitcoinj.core.Coin
 import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.wallet.Wallet
 
+const val BALANCE_THRESHOLD = "10"
 /**
  * A simple [Fragment] subclass.
  * Use the [BitcoinFragment.newInstance] factory method to
@@ -26,6 +32,8 @@ import org.bitcoinj.core.NetworkParameters
  */
 class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     ImportKeyDialog.ImportKeyDialogListener {
+
+    private var getBitcoinPressed = false
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
@@ -76,19 +84,17 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     }
 
     private fun initClickListeners() {
+        val walletManager = WalletManagerAndroid.getInstance()
         button_copy_public_address.setOnClickListener {
-            val walletManager = WalletManagerAndroid.getInstance()
             copyToClipboard(walletManager.protocolAddress().toString())
         }
 
         button_copy_wallet_seed.setOnClickListener {
-            val walletManager = WalletManagerAndroid.getInstance()
             val seed = walletManager.toSeed()
             copyToClipboard("${seed.seed}, ${seed.creationTime}")
         }
 
         button_copy_bitcoin_public_key.setOnClickListener {
-            val walletManager = WalletManagerAndroid.getInstance()
             copyToClipboard(walletManager.networkPublicECKeyHex())
         }
 
@@ -100,6 +106,52 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
                 } catch (e: IllegalStateException) {
                 }
             }, 1500)
+        }
+
+        // If the user has too little bitcoin, he can press the button to get more,
+        // the amount that is added is hardcoded on the server somewhere.
+        if (checkTooMuchBitcoin()) {
+            disableGetBitcoinButton()
+        } else {
+            enableGetBitcoinButton()
+        }
+    }
+
+    /**
+     * If the balance on your wallet is higher than BALANCE_THRESHOLD than return true, otherwise false.
+     * @return if the balance is too large
+     */
+    private fun checkTooMuchBitcoin(): Boolean {
+        val walletManager = WalletManagerAndroid.getInstance()
+        val balance = walletManager.kit.wallet().getBalance(Wallet.BalanceType.ESTIMATED)
+        return balance.isGreaterThan(Coin.parseCoin(BALANCE_THRESHOLD))
+    }
+
+    /**
+     * Disable the get BTC button, sets the color to gray and changes the onclick listener
+     */
+    @Suppress("DEPRECATION")
+    private fun disableGetBitcoinButton() {
+        add_btc.isClickable = false
+        add_btc.background.setColorFilter(Color.GRAY, PorterDuff.Mode.MULTIPLY)
+        add_btc.setOnClickListener {
+            Toast.makeText(this.requireContext(), "You already have enough bitcoin don't you think?", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Enable the get BTC button, set the color and the onclick listener correctly.
+     */
+    private fun enableGetBitcoinButton() {
+        val walletManager = WalletManagerAndroid.getInstance()
+        add_btc.isClickable = true
+        add_btc.setOnClickListener {
+            if (!getBitcoinPressed) {
+                getBitcoinPressed = true
+                addBTC(walletManager.protocolAddress().toString())
+            } else {
+                Toast.makeText(this.requireContext(), "You are already given an amount of BTC, please wait a little longer", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -118,21 +170,54 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
             return
         }
 
-        var walletManager = WalletManagerAndroid.getInstance()
+        val walletManager = WalletManagerAndroid.getInstance()
 
-        walletBalance.text =
-            "${walletManager.kit.wallet().balance.toFriendlyString()}"
-        if (walletManager.params.id === NetworkParameters.ID_MAINNET) {
-            chosenNetwork.text = "Production Network"
-        } else {
-            chosenNetwork.text = "Test Network"
+        walletBalance.text = walletManager.kit.wallet().balance.toFriendlyString()
+        walletEstimatedBalance.text = walletManager.kit.wallet().getBalance(Wallet.BalanceType.ESTIMATED).toFriendlyString()
+        chosenNetwork.text = when (walletManager.params.id) {
+            NetworkParameters.ID_MAINNET -> "Production Network"
+            NetworkParameters.ID_REGTEST -> "RegTest Network"
+            NetworkParameters.ID_TESTNET -> "TestNet Network"
+            else -> "Unknown Network selected"
         }
         val seed = walletManager.toSeed()
         walletSeed.text = "${seed.seed}, ${seed.creationTime}"
         yourPublicHex.text = walletManager.networkPublicECKeyHex()
         protocolKey.text = walletManager.protocolAddress().toString()
 
+        if (checkTooMuchBitcoin()) {
+            disableGetBitcoinButton()
+        } else {
+            enableGetBitcoinButton()
+        }
+
         requireActivity().invalidateOptionsMenu()
+    }
+
+    /**
+     * Add bitcoin to the wallet
+     * @param address - The address where I have to send the BTC to.
+     */
+    private fun addBTC(address: String) {
+        val queue = Volley.newRequestQueue(context)
+        val url = "http://$REG_TEST_FAUCET_IP:$REG_TEST_FAUCET_PORT?address=$address"
+
+        val stringRequest = StringRequest(
+            Request.Method.GET, url,
+            {
+                Log.i("Coin", "Successfully added bitcoin to $address")
+                Toast.makeText(context, "Successfully added bitcoin", Toast.LENGTH_SHORT).show()
+                getBitcoinPressed = false
+                Thread.sleep(500)
+                this.refresh(true)
+            },
+            { error ->
+                Log.i("Coin", "Failed to add bitcoin to $address; error: $error")
+                Toast.makeText(context, "Failed to add bitcoin", Toast.LENGTH_SHORT).show()
+                getBitcoinPressed = false
+            })
+
+        queue.add(stringRequest)
     }
 
     override fun onCreateView(
@@ -156,10 +241,18 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
         fun newInstance() = BitcoinFragment()
     }
 
-    override fun onImport(address: String, privateKey: String, testNet: Boolean) {
+    override fun onImport(address: String, privateKey: String) {
         if (!WalletManagerAndroid.isRunning) {
             val config = WalletManagerConfiguration(
-                if (testNet) BitcoinNetworkOptions.TEST_NET else BitcoinNetworkOptions.PRODUCTION,
+                when (bitcoin_network_radio_group.checkedRadioButtonId) {
+                    R.id.production_radiobutton -> BitcoinNetworkOptions.PRODUCTION
+                    R.id.testnet_radiobutton -> BitcoinNetworkOptions.TEST_NET
+                    R.id.regtest_radiobutton -> BitcoinNetworkOptions.REG_TEST
+                    else -> {
+                        Toast.makeText(this.requireContext(), "Please select a bitcoin network first", Toast.LENGTH_SHORT).show()
+                        return
+                    }
+                },
                 null,
                 AddressPrivateKeyPair(address, privateKey)
             )
@@ -191,7 +284,7 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
         }, 1500)
     }
 
-    fun copyToClipboard(text: String) {
+    private fun copyToClipboard(text: String) {
         val clipboard = getSystemService(this.requireContext(), ClipboardManager::class.java)!!
         val clip = ClipData.newPlainText(text, text)
         clipboard.setPrimaryClip(clip)

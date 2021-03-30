@@ -15,6 +15,7 @@ import org.bitcoinj.core.listeners.DownloadProgressTracker
 import org.bitcoinj.crypto.TransactionSignature
 import org.bitcoinj.kits.WalletAppKit
 import org.bitcoinj.params.MainNetParams
+import org.bitcoinj.params.RegTestParams
 import org.bitcoinj.params.TestNet3Params
 import org.bitcoinj.script.Script
 import org.bitcoinj.script.ScriptBuilder
@@ -24,12 +25,20 @@ import org.bitcoinj.wallet.KeyChainGroup
 import org.bitcoinj.wallet.KeyChainGroupStructure
 import org.bitcoinj.wallet.SendRequest
 import java.io.File
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.util.*
 
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
+const val REG_TEST_WALLET_NAME = "forwarding-service-regtest"
 const val MAIN_NET_WALLET_NAME = "forwarding-service"
-const val MIN_BLOCKCHAIN_PEERS = 5
+const val MIN_BLOCKCHAIN_PEERS_TEST_NET = 5
+const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
+const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
+const val REG_TEST_FAUCET_IP = "131.180.27.224"
+const val REG_TEST_FAUCET_PORT = "8000"
 
+var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
  * with bitcoin wallets (including multi-signature wallets).
@@ -56,11 +65,13 @@ class WalletManager(
         params = when (walletManagerConfiguration.network) {
             BitcoinNetworkOptions.TEST_NET -> TestNet3Params.get()
             BitcoinNetworkOptions.PRODUCTION -> MainNetParams.get()
+            BitcoinNetworkOptions.REG_TEST -> RegTestParams.get()
         }
 
         val filePrefix = when (walletManagerConfiguration.network) {
             BitcoinNetworkOptions.TEST_NET -> TEST_NET_WALLET_NAME
             BitcoinNetworkOptions.PRODUCTION -> MAIN_NET_WALLET_NAME
+            BitcoinNetworkOptions.REG_TEST -> REG_TEST_WALLET_NAME
         }
 
         kit = object : WalletAppKit(params, walletDir, filePrefix) {
@@ -72,6 +83,22 @@ class WalletManager(
                 }
                 wallet().allowSpendingUnconfirmedTransactions()
                 Log.i("Coin", "Coin: WalletManager started successfully.")
+            }
+        }
+
+        MIN_BLOCKCHAIN_PEERS = when (params) {
+            RegTestParams.get() -> MIN_BLOCKCHAIN_PEERS_REG_TEST
+            MainNetParams.get() -> MIN_BLOCKCHAIN_PEERS_PRODUCTION
+            TestNet3Params.get() -> MIN_BLOCKCHAIN_PEERS_TEST_NET
+            else -> MIN_BLOCKCHAIN_PEERS
+        }
+
+        if (params == RegTestParams.get()) {
+            try {
+                val localHost = InetAddress.getByName(REG_TEST_FAUCET_IP)
+                kit.setPeerNodes(PeerAddress(params, localHost, params.port))
+            } catch (e: UnknownHostException) {
+                throw RuntimeException(e)
             }
         }
 
@@ -141,7 +168,7 @@ class WalletManager(
         Log.i("Coin", "Coin: Imported Keys: ${kit.wallet().toString(true, false, false, null)}")
     }
 
-    fun formatKey(privateKey: String): ECKey {
+    private fun formatKey(privateKey: String): ECKey {
         return if (privateKey.length == 51 || privateKey.length == 52) {
             val dumpedPrivateKey =
                 DumpedPrivateKey.fromBase58(params, privateKey)
@@ -360,9 +387,8 @@ class WalletManager(
         val multiSigScript = previousMultiSigOutput.scriptPubKey
         val sighash: Sha256Hash =
             spendTx.hashForSignature(0, multiSigScript, Transaction.SigHash.ALL, false)
-        val signature: ECDSASignature = myPrivateKey.sign(sighash)
 
-        return signature
+        return myPrivateKey.sign(sighash)
     }
 
     /**
@@ -422,7 +448,8 @@ class WalletManager(
         Log.i("Coin", "Coin: txId: ${transaction.txId}")
         printTransactionInformation(transaction)
 
-        Log.i("Coin", "Waiting for peers")
+        Log.i("Coin", "Waiting for $MIN_BLOCKCHAIN_PEERS peers")
+        Log.i("Coin", "There are currently ${kit.peerGroup().connectedPeers.size} peers")
         kit.peerGroup().waitForPeers(MIN_BLOCKCHAIN_PEERS).get()
         Log.i("Coin", "Got >= $MIN_BLOCKCHAIN_PEERS peers: ${kit.peerGroup().connectedPeers}")
         Log.i(
@@ -430,12 +457,6 @@ class WalletManager(
             "Transaction broadcast setup ${transaction.txId} completed. Not broadcasted yet."
         )
         return kit.peerGroup().broadcastTransaction(transaction)
-
-//        broadcastTransaction.setProgressCallback { progress ->
-//            Log.i("Coin", "Coin: broadcast of transaction ${transaction.txId} progress: $progress.")
-//        }
-//        Log.i("Coin", "Coin: transaction broadcast of ${transaction.txId} is initiated.")
-//        broadcastTransaction.broadcast()
     }
 
     /**
@@ -563,6 +584,7 @@ class WalletManager(
             "Coin",
             "Coin: Setting output for residual funds ${residualFunds.value} based on a calculated fee of $calculatedFee satoshi."
         )
+
         tempResidualOutput.value = residualFunds
 
         // Set input script signatures if passed to the method
@@ -616,6 +638,7 @@ class WalletManager(
     }
 
     companion object {
+
         fun createMultiSignatureWallet(
             publicKeys: List<ECKey>,
             entranceFee: Coin,
@@ -736,6 +759,7 @@ class WalletManager(
             val params = when (paramsRaw) {
                 BitcoinNetworkOptions.TEST_NET -> TestNet3Params.get()
                 BitcoinNetworkOptions.PRODUCTION -> MainNetParams.get()
+                BitcoinNetworkOptions.REG_TEST -> RegTestParams.get()
             }
             val keyChainGroup = KeyChainGroup.builder(params, KeyChainGroupStructure.DEFAULT)
                 .fromRandom(Script.ScriptType.P2PKH).build()
