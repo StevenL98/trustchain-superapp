@@ -20,7 +20,7 @@ class CTransactionTest {
             "signatureA = privkeyA.sign_schnorr(sighashA)\n" +
             "\n" +
             "print(\"Signature for TapLeafA: {}\\n\".format(signatureA.hex()))"
-        val actual = Messages.ser_string(input).toHex()
+        val actual = Messages.serString(input).toHex()
 
         Assert.assertEquals(expected, actual)
     }
