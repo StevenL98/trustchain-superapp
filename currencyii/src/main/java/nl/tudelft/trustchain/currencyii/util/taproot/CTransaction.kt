@@ -37,7 +37,7 @@ class CTransaction(
         if ((flags and 1) != 0) {
             if (wit.vtxinwit.size != vin.size) {
                 for (i in wit.vtxinwit.size..vin.size) {
-                    wit.vtxinwit += CTxInWitness().witness_stack!!
+                    wit.vtxinwit += CTxInWitness()
                 }
             }
             r += wit.serialize()
@@ -99,7 +99,7 @@ class CScriptWitness(var stack: Array<ByteArray> = arrayOf()) {
 }
 
 class CTxWitness(
-    var vtxinwit: Array<CScriptWitness> = arrayOf()
+    var vtxinwit: Array<CTxInWitness> = arrayOf()
 ) {
     /**
      * This is different than the usual vector serialization
