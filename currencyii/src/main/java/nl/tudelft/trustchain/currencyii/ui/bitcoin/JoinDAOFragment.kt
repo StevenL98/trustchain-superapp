@@ -18,6 +18,7 @@ import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
+import nl.tudelft.trustchain.currencyii.CoinCommunity.Companion.JOIN_BLOCK
 import nl.tudelft.trustchain.currencyii.R
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
@@ -159,13 +160,10 @@ class JoinDAOFragment() : BaseFragment(R.layout.fragment_join_network) {
     private suspend fun crawlAvailableSharedWallets() {
         val allUsers = getTrustChainCommunity().getPeers()
         val gtc = getTrustChainCommunity()
-
-        val mpk = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
         for (peer in allUsers) {
             try {
-                val pk = peer.publicKey.keyToBin().toHex()
-
-                val wallets = trustchain.getUserJoinBlocks().distinctBy { parseTransactionDataGetWalletId(it.transaction) }.toSet()
+                val wallets = gtc.database.getBlocksWithType(JOIN_BLOCK)
+                    .distinctBy { parseTransactionDataGetWalletId(it.transaction) }.toSet()
                 updateSharedWallets(wallets)
             } catch (t: Throwable) {
                 val message = t.message ?: "No further information"
