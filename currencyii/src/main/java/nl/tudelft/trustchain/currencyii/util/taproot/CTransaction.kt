@@ -84,7 +84,7 @@ class CTxIn(
 }
 
 class CTxOut(
-    val nValue: Double = 0.0,
+    val nValue: Long = 0,
     val scriptPubKey: ByteArray = byteArrayOf()
 ) {
     fun serialize(): ByteArray {
@@ -253,6 +253,13 @@ fun littleEndian(int: Int): ByteArray {
     return bb.array()
 }
 
+fun littleEndian(long: Long): ByteArray {
+    val bb: ByteBuffer = ByteBuffer.allocate(8)
+    bb.order(ByteOrder.LITTLE_ENDIAN)
+    bb.putLong(long)
+    return bb.array()
+}
+
 fun TaprootSignatureHash(
     txTo: CTransaction,
     spentUtxos: Array<CTxOut>,
@@ -277,12 +284,13 @@ fun TaprootSignatureHash(
     if ((hash_type and SIGHASH_ANYONECANPAY) != 1.toByte()) {
         ssBuf += sha256(txTo.vin.map { it.prevout.serialize() }[0])
 
-        var temp: ByteArray = byteArrayOf() //TODODODODODODODODODO checked until here, so far correct
+        var temp: ByteArray = byteArrayOf()
         for (u in spentUtxos) {
-            temp += u.nValue.toByte()
+            temp += littleEndian(u.nValue)
         }
         ssBuf += sha256(temp)
-        temp = byteArrayOf()
+
+        temp = byteArrayOf() //TODODODODODODODODODO checked until here, so far correct
         for (i in txTo.vin) {
             temp += i.nSequence.toUInt().toByte()
         }
