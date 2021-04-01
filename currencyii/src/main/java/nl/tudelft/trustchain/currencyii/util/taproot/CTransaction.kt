@@ -203,7 +203,6 @@ fun ser_vector(l: Array<CTxIn>, ser_function_name: String? = null): ByteArray {
     return r
 }
 
-
 @Suppress("UNCHECKED_CAST")
 fun <R> readInstanceProperty(instance: Any, propertyName: String): R {
     val property = instance::class.members
