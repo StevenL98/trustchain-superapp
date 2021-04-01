@@ -78,7 +78,7 @@ class CTxIn(
         var r: ByteArray = byteArrayOf()
         r += prevout.serialize()
         r += Messages.serString(scriptSig)
-        r += nSequence.toUInt().toByte()
+        r += littleEndian(nSequence.toUInt())
         return r
     }
 }
