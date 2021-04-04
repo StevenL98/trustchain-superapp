@@ -12,10 +12,12 @@ import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
 import nl.tudelft.trustchain.currencyii.util.DAOJoinHelper
 import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
+import nl.tudelft.trustchain.currencyii.util.taproot.CTransaction
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.Transaction
+import java.math.BigInteger
 
 @Suppress("UNCHECKED_CAST")
 class CoinCommunity : Community() {
@@ -72,17 +74,13 @@ class CoinCommunity : Community() {
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>,
-        progressCallback: ((progress: Double) -> Unit)? = null,
-        timeout: Long = DEFAULT_BITCOIN_MAX_TIMEOUT
+        signatures: List<String>
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures,
-            progressCallback,
-            timeout
+            signatures
         )
     }
 
@@ -268,10 +266,10 @@ class CoinCommunity : Community() {
             .SW_PREVIOUS_BLOCK_HASH
         val mostRecentSWBlock = fetchLatestSharedWalletBlock(latestHash.hexToBytes())
             ?: throw IllegalStateException("Most recent DAO block not found")
-        val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
-            .SW_TRANSACTION_SERIALIZED
+        val joinBlock = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
+        val oldTransaction = joinBlock.SW_TRANSACTION_SERIALIZED
 
-        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, myPublicKey, votedInFavor)
+        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, joinBlock, myPublicKey, votedInFavor)
     }
 
     /**
@@ -349,20 +347,22 @@ class CoinCommunity : Community() {
     /**
      * Get my signature to check if I already voted
      */
-    fun getMySignatureJoinRequest(data: SWSignatureAskBlockTD): ECKey.ECDSASignature {
+    fun getMySignatureJoinRequest(data: SWSignatureAskBlockTD): BigInteger {
         val walletManager = WalletManagerAndroid.getInstance()
 
         val latestHash = data.SW_PREVIOUS_BLOCK_HASH
         val mostRecentSWBlock =
             fetchLatestSharedWalletBlock(latestHash.hexToBytes())
                 ?: throw IllegalStateException("Most recent DAO block not found")
-        val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
-            .SW_TRANSACTION_SERIALIZED
+        val joinBlock = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
+        val oldTransaction = joinBlock.SW_TRANSACTION_SERIALIZED
 
         val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
         return walletManager.safeSigningJoinWalletTransaction(
-            Transaction(walletManager.params, newTransactionSerialized.hexToBytes()),
             Transaction(walletManager.params, oldTransaction.hexToBytes()),
+            CTransaction.deserialize(newTransactionSerialized.hexToBytes()),
+            joinBlock.SW_BITCOIN_PKS.map{ECKey.fromPublicOnly(it.hexToBytes())},
+            joinBlock.SW_NONCE_PKS.map{ECKey.fromPublicOnly(it.hexToBytes())},
             walletManager.protocolECKey()
         )
     }
@@ -433,11 +433,15 @@ class CoinCommunity : Community() {
         // Block type for basic signature requests
         const val SIGNATURE_ASK_BLOCK = "v1DAO_ASK_SIGNATURE"
 
+        const val NONCE_ASK_BLOCK = "v1DAO_ASK_NONCE"
+
         // Block type for transfer funds signature requests
         const val TRANSFER_FUNDS_ASK_BLOCK = "v1DAO_TRANSFER_ASK_SIGNATURE"
 
         // Block type for responding to a signature request with a (should be valid) signature
         const val SIGNATURE_AGREEMENT_BLOCK = "v1DAO_SIGNATURE_AGREEMENT"
+
+        const val NONCE_AGREEMENT_BLOCK = "v1DAO_NONCE_AGREEMENT"
 
         // Block type for responding with a negative vote to a signature request with a signature
         const val SIGNATURE_AGREEMENT_NEGATIVE_BLOCK = "v1DAO_SIGNATURE_AGREEMENT_NEGATIVE"

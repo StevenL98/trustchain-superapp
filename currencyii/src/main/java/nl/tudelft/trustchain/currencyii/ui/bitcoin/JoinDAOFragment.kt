@@ -14,11 +14,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
+import nl.tudelft.trustchain.currencyii.util.taproot.MuSig
+import org.bitcoinj.core.ECKey
 
 /**
  * A simple [Fragment] subclass.
@@ -215,8 +218,7 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
             getCoinCommunity().joinBitcoinWallet(
                 mostRecentSWBlock.transaction,
                 proposeBlockData,
-                signatures,
-                ::updateAlertLabel
+                signatures
             )
         } catch (t: Throwable) {
             Log.i("Coin", "Joining failed. ${t.message ?: "No further information"}.")
