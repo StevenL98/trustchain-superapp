@@ -13,7 +13,6 @@ import org.bitcoinj.core.*
 import org.bitcoinj.core.DumpedPrivateKey
 import org.bitcoinj.core.ECKey.ECDSASignature
 import org.bitcoinj.core.LegacyAddress
-import org.bitcoinj.core.SegwitAddress
 import org.bitcoinj.core.listeners.DownloadProgressTracker
 import org.bitcoinj.crypto.TransactionSignature
 import org.bitcoinj.kits.WalletAppKit
@@ -347,7 +346,7 @@ class WalletManager(
 
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
 
-        val privChallenge1 = key.privKey.multiply(BigInteger(1, cMap[key])).mod(Schnorr.n)
+        val privChallenge1 = key.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
 
         val oldMultiSignatureOutput = getMuSigOutput(oldTransaction).unsignedOutput
         val txVout = CTxOut(nValue = oldMultiSignatureOutput.value.value, scriptPubKey = oldMultiSignatureOutput.scriptPubKey.toString().hexToBytes())

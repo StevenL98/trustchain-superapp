@@ -360,9 +360,9 @@ class CoinCommunity : Community() {
         val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
         return walletManager.safeSigningJoinWalletTransaction(
             Transaction(walletManager.params, oldTransaction.hexToBytes()),
-            CTransaction.deserialize(newTransactionSerialized.hexToBytes()),
-            joinBlock.SW_BITCOIN_PKS.map{ECKey.fromPublicOnly(it.hexToBytes())},
-            joinBlock.SW_NONCE_PKS.map{ECKey.fromPublicOnly(it.hexToBytes())},
+            CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
+            joinBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
+            joinBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             walletManager.protocolECKey()
         )
     }
