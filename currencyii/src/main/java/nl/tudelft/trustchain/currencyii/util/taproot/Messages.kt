@@ -95,7 +95,7 @@ class Messages {
         fun deserializeUInt256(bytes: ByteIterator): String {
             var r = ""
             for (i in 0 until 8) {
-                val t = ByteBuffer.wrap(read(bytes, 4)).order(ByteOrder.LITTLE_ENDIAN).int
+                val t = ByteBuffer.wrap(read(bytes, 4)).order(ByteOrder.LITTLE_ENDIAN).int.toUInt()
                 r += t.shl(i * 32)
             }
             return r
