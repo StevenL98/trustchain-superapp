@@ -94,7 +94,7 @@ class CTransactionTest {
 
         spending_tx.wit.vtxinwit = arrayOf(CTxInWitness(arrayOf("7bdd007a2ada0fbf18fe8ea7858398e2775195db1a2cef127ef38eef861027bf4f058be84a536603799b4acce1f0eeb048c634d740aa38351cb18b7465e4b125".hexToBytes())))
 
-        val expected = spending_tx.serialize()
+        val expected = serialized
         val actual = CTransaction().deserialize(serialized.hexToBytes()).serialize()
 
         Assert.assertEquals(expected, actual)
