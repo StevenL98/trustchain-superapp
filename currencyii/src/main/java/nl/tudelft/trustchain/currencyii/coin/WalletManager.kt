@@ -14,6 +14,7 @@ import org.bitcoinj.core.DumpedPrivateKey
 import org.bitcoinj.core.ECKey.ECDSASignature
 import org.bitcoinj.core.LegacyAddress
 import org.bitcoinj.core.listeners.DownloadProgressTracker
+import org.bitcoinj.crypto.DeterministicKey
 import org.bitcoinj.crypto.TransactionSignature
 import org.bitcoinj.kits.WalletAppKit
 import org.bitcoinj.params.MainNetParams
@@ -21,7 +22,6 @@ import org.bitcoinj.params.RegTestParams
 import org.bitcoinj.params.TestNet3Params
 import org.bitcoinj.script.Script
 import org.bitcoinj.script.ScriptBuilder
-import org.bitcoinj.script.ScriptException
 import org.bitcoinj.script.ScriptPattern
 import org.bitcoinj.wallet.DeterministicSeed
 import org.bitcoinj.wallet.KeyChainGroup
@@ -61,7 +61,8 @@ class WalletManager(
     val params: NetworkParameters
     var isDownloading: Boolean = true
     var progress: Int = 0
-    var noncePoint: ECPoint? = null
+    var nonceKey: Pair<ECKey, ECPoint>? = null
+    val key = addressPrivateKeyPair
 
     /**
      * Initializes WalletManager.
@@ -213,16 +214,16 @@ class WalletManager(
         return protocolECKey().publicKeyAsHex
     }
 
-    fun generateNewNonceECPoint() {
-        noncePoint = Key.generate_schnorr_nonce().second
+    fun generateNewNonceKey() {
+        nonceKey = Key.generate_schnorr_nonce()
     }
 
     fun nonceECPointHex(): String {
-        if (noncePoint == null) {
-            generateNewNonceECPoint()
+        if (nonceKey == null) {
+            generateNewNonceKey()
         }
 
-        return noncePoint!!.getEncoded(true).toHex()
+        return nonceKey!!.second.getEncoded(true).toHex()
     }
 
     /**
@@ -250,9 +251,6 @@ class WalletManager(
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
-        Log.i("YEET ADDRESS", programMusig)
-        Log.i("YEET PROGRAM", addressMuSig)
-
         val transaction = Transaction(params)
         // Add an output with the entrance fee & MuSig address.
         transaction.addOutput(entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig))
@@ -264,11 +262,6 @@ class WalletManager(
         kit.wallet().completeTx(req)
 
         return sendTransaction(req.tx)
-    }
-
-    @Throws(ScriptException::class)
-    fun getScriptPubKey(scriptBytes: ByteArray): Script {
-        return Script(scriptBytes)
     }
 
     /**
@@ -289,14 +282,14 @@ class WalletManager(
 
         Log.i("Coin", "Coin: making a transaction with you in it for everyone to sign.")
 
-        val oldTransaction = Transaction(params, oldTransactionSerialized.hexToBytes())
-        val oldMultiSignatureOutput = getMuSigOutput(oldTransaction).unsignedOutput
+        val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
+        val oldMultiSignatureOutput = oldTransaction.vout[0].nValue
 
-        val outpoint = COutPoint(oldTransaction.txId.toString(), 0)
+        val outpoint = COutPoint(Transaction(params, oldTransactionSerialized.hexToBytes()).txId.toString(), 0)
         val cTxIn = CTxIn(prevout = outpoint, scriptSig = byteArrayOf(), nSequence = 0)
 
         // Calculate the final amount of coins (old coins + entrance fee) that will be the new multi-sig.
-        val newMultiSignatureOutputMoney = oldMultiSignatureOutput.value.add(entranceFee)
+        val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
             Log.i("Coin", "Coin: de-serializing key $publicHexKey.")
@@ -306,7 +299,8 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(newKeys)
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
-        val cTxOut = CTxOut(nValue = newMultiSignatureOutputMoney.value, scriptPubKey = ScriptBuilder.createP2WPKHOutputScript(Utils.sha256hash160(pubKeyDataMusig)).program)
+        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1))
+        val cTxOut = CTxOut(nValue = newMultiSignatureOutputMoney.value, scriptPubKey = "5121".hexToBytes().plus(programMusig))
 
         val newTransaction = CTransaction(
             nVersion = 1,
@@ -336,7 +330,7 @@ class WalletManager(
      * @return the signature (you need to send back)
      */
     fun safeSigningJoinWalletTransaction(
-        oldTransaction: Transaction,
+        oldTransaction: CTransaction,
         newTransaction: CTransaction,
         publicKeys: List<ECKey>,
         nonces: List<ECKey>,
@@ -346,14 +340,15 @@ class WalletManager(
 
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
 
-        val privChallenge1 = key.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
+        val detKey = key as DeterministicKey
 
-        val oldMultiSignatureOutput = getMuSigOutput(oldTransaction).unsignedOutput
-        val txVout = CTxOut(nValue = oldMultiSignatureOutput.value.value, scriptPubKey = oldMultiSignatureOutput.scriptPubKey.toString().hexToBytes())
+        val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
+
+        val oldMultiSignatureOutput = oldTransaction.vout[0]
+        val txVout = CTxOut(nValue = oldMultiSignatureOutput.nValue, scriptPubKey = oldMultiSignatureOutput.scriptPubKey)
         val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, arrayOf(txVout), SIGHASH_ALL_TAPROOT, input_index = 0)
-        val signature = MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), ECKey.fromPublicOnly(noncePoint), MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
-
-        Log.i("Coin", "Coin: key -> ${key.publicKeyAsHex}")
+        // TODO: make noncekey persistent across restarts
+        val signature = MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), nonceKey!!.first, MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
 
         return signature
     }
