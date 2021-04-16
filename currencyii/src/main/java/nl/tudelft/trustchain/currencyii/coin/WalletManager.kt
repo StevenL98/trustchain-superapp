@@ -36,7 +36,6 @@ import java.net.UnknownHostException
 import java.util.*
 import kotlin.experimental.and
 
-
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
 const val REG_TEST_WALLET_NAME = "forwarding-service-regtest"
 const val MAIN_NET_WALLET_NAME = "forwarding-service"
