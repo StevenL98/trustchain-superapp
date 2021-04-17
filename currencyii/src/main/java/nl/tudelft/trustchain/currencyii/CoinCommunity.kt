@@ -88,13 +88,13 @@ class CoinCommunity : Community() {
      * Assumed that people agreed to the transfer.
      */
     fun proposeTransferFunds(
-        mostRecentWallet: TrustChainBlock,
+        walletBlock: TrustChainBlock,
         receiverAddressSerialized: String,
         satoshiAmount: Long
     ): SWTransferFundsAskTransactionData {
         return daoTransferFundsHelper.proposeTransferFunds(
             myPeer,
-            mostRecentWallet,
+            walletBlock,
             receiverAddressSerialized,
             satoshiAmount
         )
@@ -382,7 +382,7 @@ class CoinCommunity : Community() {
         )
         val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
         return walletManager.safeSigningTransactionFromMultiSig(
-            CTransaction().deserialize(oldTransaction.hexToBytes()),
+            oldTransaction,
             CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
             transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },

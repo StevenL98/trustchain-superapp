@@ -12,11 +12,9 @@ import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
 import org.bitcoinj.core.DumpedPrivateKey
-import org.bitcoinj.core.ECKey.ECDSASignature
 import org.bitcoinj.core.LegacyAddress
 import org.bitcoinj.core.listeners.DownloadProgressTracker
 import org.bitcoinj.crypto.DeterministicKey
-import org.bitcoinj.crypto.TransactionSignature
 import org.bitcoinj.kits.WalletAppKit
 import org.bitcoinj.params.MainNetParams
 import org.bitcoinj.params.RegTestParams
@@ -43,7 +41,7 @@ const val MIN_BLOCKCHAIN_PEERS_TEST_NET = 5
 const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
-//const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
+// const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
@@ -388,7 +386,7 @@ class WalletManager(
      * @return ECDSASignature
      */
     fun safeSigningTransactionFromMultiSig(
-        oldTransaction: CTransaction,
+        oldTransactionSerialized: String,
         newTransaction: CTransaction,
         publicKeys: List<ECKey>,
         nonces: List<ECKey>,
@@ -402,14 +400,17 @@ class WalletManager(
 
         val detKey = key as DeterministicKey
 
+        val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
+        val outpoint = COutPoint(Transaction(params, oldTransactionSerialized.hexToBytes()).txId.toString())
+
 //        Populate the transaction inputs
-        newTransaction.vin = arrayOf(CTxIn())
+        newTransaction.vin = arrayOf(CTxIn(outpoint))
         // TODO: Check if receiverAddress.hash is correct
         newTransaction.vout = arrayOf(CTxOut(paymentAmount, receiverAddress.hash))
 
         val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
 
-        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = 0)
+        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, arrayOf(oldTransaction.vout[0]), SIGHASH_ALL_TAPROOT, input_index = 0)
 
         return MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
     }
@@ -427,14 +428,16 @@ class WalletManager(
     fun safeSendingTransactionFromMultiSig(
         signaturesOfOldOwners: List<BigInteger>,
         aggregateNonce: ECPoint,
-        newTransaction: CTransaction,
+        transactionSerialized: String,
         receiverAddress: org.bitcoinj.core.Address,
         paymentAmount: Long
     ): Pair<Boolean, String> {
         Log.i("Coin", "Coin: (safeSendingTransactionFromMultiSig start).")
+        val newTransaction = CTransaction()
 
 //      Populate the transaction inputs
-        newTransaction.vin = arrayOf(CTxIn())
+        val outpoint = COutPoint(Transaction(params, transactionSerialized.hexToBytes()).txId.toString())
+        newTransaction.vin = arrayOf(CTxIn(outpoint))
         // TODO: Check if receiverAddress.hash is correct
         newTransaction.vout = arrayOf(CTxOut(paymentAmount, receiverAddress.hash))
 
