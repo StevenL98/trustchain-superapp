@@ -1,6 +1,11 @@
 package nl.tudelft.trustchain.currencyii.coin
 
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.common.base.Joiner
 import com.google.gson.JsonParser
 import info.blockchain.api.APIException
@@ -359,7 +364,8 @@ class WalletManager(
     fun safeSendingJoinWalletTransaction(
         signaturesOfOldOwners: List<BigInteger>,
         aggregateNonce: ECPoint,
-        newTransaction: CTransaction
+        newTransaction: CTransaction,
+        context: Context
     ): Pair<Boolean, String> {
         Log.i("Coin", "Coin: (safeSendingJoinWalletTransaction start).")
         Log.i("Coin", "Coin: make the new final transaction for the new wallet.")
@@ -372,7 +378,7 @@ class WalletManager(
 
         newTransaction.wit = cTxWitness
 
-        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
+        return Pair(sendTaprootTransaction(newTransaction, context), newTransaction.serialize().toHex())
     }
 
     /**
@@ -430,7 +436,8 @@ class WalletManager(
         aggregateNonce: ECPoint,
         transactionSerialized: String,
         receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Long
+        paymentAmount: Long,
+        context: Context
     ): Pair<Boolean, String> {
         Log.i("Coin", "Coin: (safeSendingTransactionFromMultiSig start).")
         val newTransaction = CTransaction()
@@ -448,32 +455,32 @@ class WalletManager(
 
         newTransaction.wit = cTxWitness
 
-        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
+        return Pair(sendTaprootTransaction(newTransaction, context), newTransaction.serialize().toHex())
     }
 
-    private fun sendTaprootTransaction(transaction: CTransaction): Boolean {
+    private fun sendTaprootTransaction(transaction: CTransaction, context: Context): Boolean {
         // TODO: submit serialized transaction string to python server
         Log.i("YEET", "transaction serialized: ${transaction.serialize().toHex()}")
 
         val yeet = transaction.serialize().toHex()
         print(yeet)
 
-//        val context = // todo
-//
-//        val queue = Volley.newRequestQueue(context)
-//        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
-//
-//        val stringRequest = StringRequest(
-//            Request.Method.GET, url,
-//            {
-//                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
-//                Thread.sleep(500)
-//            },
-//            { error ->
-//                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
-//            })
-//
-//        queue.add(stringRequest)
+        val queue = Volley.newRequestQueue(context)
+        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
+
+        val stringRequest = StringRequest(
+            Request.Method.GET, url,
+            {
+                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
+                Log.i("YEET", it)
+                Thread.sleep(500)
+            },
+            { error ->
+                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
+                Log.i("YEET", error.toString())
+            })
+
+        queue.add(stringRequest)
 
         return true
     }
