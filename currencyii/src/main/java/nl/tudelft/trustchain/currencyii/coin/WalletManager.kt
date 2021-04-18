@@ -11,6 +11,7 @@ import info.blockchain.api.APIException
 import info.blockchain.api.blockexplorer.BlockExplorer
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.CurrencyIIMainActivity
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
@@ -38,6 +39,7 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.experimental.and
 
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
@@ -382,7 +384,11 @@ class WalletManager(
 
         newTransaction.wit = cTxWitness
 
-        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
+        val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
+
+        return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
+
+//        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
     /**
