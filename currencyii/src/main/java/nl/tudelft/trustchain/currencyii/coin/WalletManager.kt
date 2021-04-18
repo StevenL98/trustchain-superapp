@@ -11,6 +11,7 @@ import info.blockchain.api.APIException
 import info.blockchain.api.blockexplorer.BlockExplorer
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.NONCE_KEY
 import nl.tudelft.trustchain.currencyii.CurrencyIIMainActivity
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
@@ -50,6 +51,7 @@ const val REG_TEST_FAUCET_IP = "131.180.27.224"
 //const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
+
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
  * with bitcoin wallets (including multi-signature wallets).
@@ -66,7 +68,6 @@ class WalletManager(
     val params: NetworkParameters
     var isDownloading: Boolean = true
     var progress: Int = 0
-    var nonceKey: Pair<ECKey, ECPoint>? = null
     val key = addressPrivateKeyPair
 
     /**
@@ -219,16 +220,8 @@ class WalletManager(
         return protocolECKey().publicKeyAsHex
     }
 
-    fun generateNewNonceKey() {
-        nonceKey = Key.generate_schnorr_nonce()
-    }
-
     fun nonceECPointHex(): String {
-        if (nonceKey == null) {
-            generateNewNonceKey()
-        }
-
-        return nonceKey!!.second.getEncoded(true).toHex()
+        return NONCE_KEY.second.getEncoded(true).toHex()
     }
 
     /**
@@ -252,13 +245,22 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(listOf(protocolECKey()))
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
-        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
+        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(
+            pubKeyDataMusig.drop(
+                1
+            )
+        ).toHex()
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
         val transaction = Transaction(params)
         // Add an output with the entrance fee & MuSig address.
-        transaction.addOutput(entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig))
+        transaction.addOutput(
+            entranceFee, org.bitcoinj.core.Address.fromString(
+                params,
+                addressMuSig
+            )
+        )
 
         Log.i("Coin", "Coin: use SendRequest to add our entranceFee input & change address.")
 
@@ -289,6 +291,7 @@ class WalletManager(
 
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
+
         val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
@@ -299,6 +302,7 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(newKeys)
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
+
         val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
@@ -347,13 +351,19 @@ class WalletManager(
 
         val detKey = key as DeterministicKey
 
-        val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
+        val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(
+            Schnorr.n
+        )
 
         val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
 
         val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
-        // TODO: make noncekey persistent across restarts
-        val signature = MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), nonceKey!!.first, MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
+        
+        val signature = MuSig.sign_musig(
+            ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
+                nonces
+            ).first, aggPubKey, sighashMuSig
+        )
 
         return signature
     }
@@ -375,7 +385,10 @@ class WalletManager(
         Log.i("Coin", "Coin: make the new final transaction for the new wallet.")
         Log.i("Coin", "Coin: using ${signaturesOfOldOwners.size} signatures.")
 
-        val aggregateSignature = MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
+        val aggregateSignature = MuSig.aggregate_musig_signatures(
+            signaturesOfOldOwners,
+            aggregateNonce
+        )
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
         val cTxWitness = CTxWitness(arrayOf(cTxInWitness))
@@ -556,7 +569,7 @@ class WalletManager(
         } else {
             Log.i(
                 "Coin", "Coin: (attemptToGetTransactionAndSerialize) " +
-                "the transaction $transaction could not be found in your wallet."
+                    "the transaction $transaction could not be found in your wallet."
             )
             return null
         }
