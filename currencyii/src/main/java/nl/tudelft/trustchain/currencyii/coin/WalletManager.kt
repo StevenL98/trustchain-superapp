@@ -349,7 +349,9 @@ class WalletManager(
 
         val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
 
-        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = 0)
+        val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
+
+        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
         // TODO: make noncekey persistent across restarts
         val signature = MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), nonceKey!!.first, MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
 
@@ -502,6 +504,9 @@ class WalletManager(
         Log.i("Coin", "Coin: (sendTransaction start).")
         Log.i("Coin", "Coin: txId: ${transaction.txId}")
 //        printTransactionInformation(transaction)
+
+        val yeet = transaction.bitcoinSerialize().toHex()
+        print(yeet)
 
         Log.i("Coin", "Waiting for $MIN_BLOCKCHAIN_PEERS peers")
         Log.i("Coin", "There are currently ${kit.peerGroup().connectedPeers.size} peers")
