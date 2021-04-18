@@ -1,6 +1,10 @@
 package nl.tudelft.trustchain.currencyii.coin
 
 import android.util.Log
+import android.widget.Toast
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.common.base.Joiner
 import com.google.gson.JsonParser
 import info.blockchain.api.APIException
@@ -8,6 +12,7 @@ import info.blockchain.api.blockexplorer.BlockExplorer
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.NONCE_KEY
+import nl.tudelft.trustchain.currencyii.CurrencyIIMainActivity
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
@@ -43,7 +48,7 @@ const val MIN_BLOCKCHAIN_PEERS_TEST_NET = 5
 const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
-const val REG_TEST_FAUCET_PORT = "8000"
+//const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
@@ -284,19 +289,10 @@ class WalletManager(
 
         Log.i("Coin", "Coin: making a transaction with you in it for everyone to sign.")
 
+        val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
-        val oldMultiSignatureOutput = oldTransaction.vout[0].nValue
 
-        val outpoint = COutPoint(
-            Transaction(
-                params,
-                oldTransactionSerialized.hexToBytes()
-            ).txId.toString(), 0
-        )
-        val cTxIn = CTxIn(prevout = outpoint, scriptSig = byteArrayOf(), nSequence = 0)
-
-        // Calculate the final amount of coins (old coins + entrance fee) that will be the new multi-sig.
-        val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
+        val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
             Log.i("Coin", "Coin: de-serializing key $publicHexKey.")
@@ -306,24 +302,22 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(newKeys)
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
-        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(
-            pubKeyDataMusig.drop(
-                1
-            )
-        )
-        val cTxOut = CTxOut(
-            nValue = newMultiSignatureOutputMoney.value, scriptPubKey = "5121".hexToBytes().plus(
-                programMusig
-            )
-        )
 
-        val newTransaction = CTransaction(
-            nVersion = 1,
-            vin = arrayOf(cTxIn),
-            vout = arrayOf(cTxOut),
-            wit = CTxWitness(),
-            nLockTime = 0
-        )
+        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
+        val version = 1
+        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+
+        // Calculate the final amount of coins (old coins + entrance fee) that will be the new multi-sig.
+        val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
+        newTransaction.addOutput(newMultiSignatureOutputMoney, org.bitcoinj.core.Address.fromString(params, addressMuSig))
+
+        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs.filter { it.scriptBytes.size == 35 }[0])
+        multisigInput.disconnect()
+
+        val req = SendRequest.forTx(newTransaction)
+        printTransactionInformation(req.tx)
+        req.changeAddress = protocolAddress()
+        kit.wallet().completeTx(req)
 
         Log.i("Coin", "Coin: output (1) -> we are adding the final new multi-sig output.")
 
@@ -332,7 +326,7 @@ class WalletManager(
         Log.i("Coin", "Coin: use SendRequest to add our entranceFee inputs & change address.")
 
         return TransactionPackage(
-            newTransaction.serialize().toHex()
+            newTransaction.bitcoinSerialize().toHex()
         )
     }
 
@@ -361,18 +355,10 @@ class WalletManager(
             Schnorr.n
         )
 
-        val oldMultiSignatureOutput = oldTransaction.vout[0]
-        val txVout = CTxOut(
-            nValue = oldMultiSignatureOutput.nValue,
-            scriptPubKey = oldMultiSignatureOutput.scriptPubKey
-        )
-        val sighashMuSig = CTransaction.TaprootSignatureHash(
-            newTransaction,
-            arrayOf(txVout),
-            SIGHASH_ALL_TAPROOT,
-            input_index = 0
-        )
-        // TODO: make noncekey persistent across restarts
+        val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
+
+        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
+        
         val signature = MuSig.sign_musig(
             ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
                 nonces
@@ -500,6 +486,26 @@ class WalletManager(
         // TODO: submit serialized transaction string to python server
         Log.i("YEET", "transaction serialized: ${transaction.serialize().toHex()}")
 
+        val yeet = transaction.serialize().toHex()
+        print(yeet)
+
+//        val context = // todo
+//
+//        val queue = Volley.newRequestQueue(context)
+//        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
+//
+//        val stringRequest = StringRequest(
+//            Request.Method.GET, url,
+//            {
+//                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
+//                Thread.sleep(500)
+//            },
+//            { error ->
+//                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
+//            })
+//
+//        queue.add(stringRequest)
+
         return true
     }
 
@@ -511,6 +517,9 @@ class WalletManager(
         Log.i("Coin", "Coin: (sendTransaction start).")
         Log.i("Coin", "Coin: txId: ${transaction.txId}")
 //        printTransactionInformation(transaction)
+
+        val yeet = transaction.bitcoinSerialize().toHex()
+        print(yeet)
 
         Log.i("Coin", "Waiting for $MIN_BLOCKCHAIN_PEERS peers")
         Log.i("Coin", "There are currently ${kit.peerGroup().connectedPeers.size} peers")
