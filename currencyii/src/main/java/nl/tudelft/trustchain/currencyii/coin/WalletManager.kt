@@ -307,7 +307,7 @@ class WalletManager(
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(newMultiSignatureOutputMoney, org.bitcoinj.core.Address.fromString(params, addressMuSig))
 
-        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs[0]) // is 0 correct?
+        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs.filter { it.scriptBytes.size == 35 }[0])
         multisigInput.disconnect()
 
         val req = SendRequest.forTx(newTransaction)
