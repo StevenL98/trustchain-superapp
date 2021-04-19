@@ -46,7 +46,6 @@ const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
 // const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
-
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 /**
@@ -388,7 +387,7 @@ class WalletManager(
         val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //TODO probably correct that there are only 2 inputs
+        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) // TODO probably correct that there are only 2 inputs
         cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
@@ -397,7 +396,7 @@ class WalletManager(
         print(yeet)
 
         val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
-
+        //println(context)
         return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
 
 //        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
@@ -498,7 +497,7 @@ class WalletManager(
 
         val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
-        newTransaction.addOutput(Coin.valueOf(oldMultiSignatureOutput - paymentAmount), org.bitcoinj.core.Address.fromString(params, addressMuSig))
+        newTransaction.addOutput(Coin.valueOf(oldMultiSignatureOutput - paymentAmount), org.bitcoinj.core.Address.fromString(params, addressMuSig)) //todo probably subtract fees or something idk
 
         val newCTx = CTransaction().deserialize(newTransaction.bitcoinSerialize())
         return Pair(oldTransaction, newCTx)
