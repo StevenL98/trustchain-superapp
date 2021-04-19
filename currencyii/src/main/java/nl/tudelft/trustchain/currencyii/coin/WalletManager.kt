@@ -405,7 +405,7 @@ class WalletManager(
         print(yeet)
 
         val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
-
+        println(context)
         return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
 
 //        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
@@ -494,6 +494,8 @@ class WalletManager(
 
         val yeet = transaction.serialize().toHex()
         print(yeet)
+
+        println(context)
 
 //        val context = // todo
 //
