@@ -2,10 +2,6 @@ package nl.tudelft.trustchain.currencyii.coin
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
-import com.android.volley.Request
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
 import com.google.common.base.Joiner
 import com.google.gson.JsonParser
 import info.blockchain.api.APIException
@@ -14,7 +10,6 @@ import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.NONCE_KEY
-import nl.tudelft.trustchain.currencyii.CurrencyIIMainActivity
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
@@ -50,7 +45,6 @@ const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
 // const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
-
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
@@ -396,7 +390,7 @@ class WalletManager(
         val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //TODO probably correct that there are only 2 inputs
+        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) // TODO probably correct that there are only 2 inputs
         cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
