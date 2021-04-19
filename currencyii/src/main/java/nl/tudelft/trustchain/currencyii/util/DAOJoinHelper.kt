@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii.util
 
+import android.content.Context
 import android.util.Log
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.android.IPv8Android
@@ -47,7 +48,8 @@ class DAOJoinHelper {
             createBitcoinSharedWalletForJoining(blockData).serializedTransaction
 
         val total = blockData.SW_BITCOIN_PKS.size
-        val requiredSignatures = total
+        val requiredSignatures =
+            SWUtil.percentageToIntThreshold(total, blockData.SW_VOTING_THRESHOLD)
 
         val proposalIDSignature = SWUtil.randomUUID()
 
@@ -120,7 +122,8 @@ class DAOJoinHelper {
         myPeer: Peer,
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>
+        signatures: List<String>,
+        context: Context
     ) {
         val oldWalletBlockData = SWJoinBlockTransactionData(walletBlockData)
         val newTransactionSerialized = blockData.SW_TRANSACTION_SERIALIZED
@@ -141,7 +144,8 @@ class DAOJoinHelper {
         val (status, serializedTransaction) = walletManager.safeSendingJoinWalletTransaction(
             signaturesOfOldOwners,
             aggregateNoncePoint,
-            CTransaction().deserialize(newTransactionProposal)
+            CTransaction().deserialize(newTransactionProposal),
+            context
         )
 
         if (status) {
@@ -189,13 +193,9 @@ class DAOJoinHelper {
             votedInFavor: Boolean
         ) {
             val trustchain = TrustChainHelper(IPv8Android.getInstance().getOverlay() ?: return)
-
             val blockData = SWSignatureAskTransactionData(block.transaction).getData()
 
-            Log.i(
-                "Coin",
-                "Signature request for joining: ${blockData.SW_RECEIVER_PK}, me: ${myPublicKey.toHex()}"
-            )
+            Log.i("Coin", "Signature request for joining: ${blockData.SW_RECEIVER_PK}, me: ${myPublicKey.toHex()}")
 
             if (blockData.SW_RECEIVER_PK != myPublicKey.toHex()) {
                 return

@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii
 
+import android.content.Context
 import nl.tudelft.ipv8.Community
 import nl.tudelft.ipv8.android.IPv8Android
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
@@ -14,7 +15,6 @@ import nl.tudelft.trustchain.currencyii.util.DAOJoinHelper
 import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
 import nl.tudelft.trustchain.currencyii.util.taproot.CTransaction
 import org.bitcoinj.core.Address
-import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.Transaction
 import java.math.BigInteger
@@ -74,13 +74,15 @@ class CoinCommunity : Community() {
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>
+        signatures: List<String>,
+        context: Context
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures
+            signatures,
+            context
         )
     }
 
@@ -89,13 +91,13 @@ class CoinCommunity : Community() {
      * Assumed that people agreed to the transfer.
      */
     fun proposeTransferFunds(
-        mostRecentWallet: TrustChainBlock,
+        walletBlock: TrustChainBlock,
         receiverAddressSerialized: String,
         satoshiAmount: Long
     ): SWTransferFundsAskTransactionData {
         return daoTransferFundsHelper.proposeTransferFunds(
             myPeer,
-            mostRecentWallet,
+            walletBlock,
             receiverAddressSerialized,
             satoshiAmount
         )
@@ -105,23 +107,21 @@ class CoinCommunity : Community() {
      * 3.2 Transfer funds from an existing shared wallet to a third-party. Broadcast bitcoin transaction.
      */
     fun transferFunds(
-        transferFundsData: SWTransferFundsAskTransactionData,
-        walletData: SWJoinBlockTD,
-        serializedSignatures: List<String>,
+        walletBlockData: TrustChainTransaction,
+        blockData: SWTransferFundsAskBlockTD,
+        signatures: List<String>,
         receiverAddress: String,
         satoshiAmount: Long,
-        progressCallback: ((progress: Double) -> Unit)? = null,
-        timeout: Long = DEFAULT_BITCOIN_MAX_TIMEOUT
+        context: Context
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
-            transferFundsData,
-            walletData,
-            serializedSignatures,
+            walletBlockData,
+            blockData,
+            signatures,
             receiverAddress,
             satoshiAmount,
-            progressCallback,
-            timeout
+            context
         )
     }
 
@@ -284,12 +284,13 @@ class CoinCommunity : Community() {
             .SW_PREVIOUS_BLOCK_HASH
         val mostRecentSWBlock = fetchLatestSharedWalletBlock(latestHash.hexToBytes())
             ?: throw IllegalStateException("Most recent DAO block not found")
-        val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
-            .SW_TRANSACTION_SERIALIZED
+        val transferBlock = SWTransferDoneTransactionData(mostRecentSWBlock.transaction).getData()
+        val oldTransaction = transferBlock.SW_TRANSACTION_SERIALIZED
 
         DAOTransferFundsHelper.transferFundsBlockReceived(
             oldTransaction,
             block,
+            transferBlock,
             myPublicKey,
             votedInFavor
         )
@@ -370,30 +371,29 @@ class CoinCommunity : Community() {
     /**
      * Get my signature to check if I already voted
      */
-    fun getMySignatureTransaction(data: SWTransferFundsAskBlockTD): ECKey.ECDSASignature {
+    fun getMySignatureTransaction(data: SWTransferFundsAskBlockTD): BigInteger {
         val walletManager = WalletManagerAndroid.getInstance()
 
         val latestHash = data.SW_PREVIOUS_BLOCK_HASH
         val mostRecentSWBlock =
             fetchLatestSharedWalletBlock(latestHash.hexToBytes())
                 ?: throw IllegalStateException("Most recent DAO block not found")
-        val oldTransaction = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
-            .SW_TRANSACTION_SERIALIZED
+        val transferBlock = SWTransferDoneTransactionData(mostRecentSWBlock.transaction).getData()
+        val oldTransaction = transferBlock.SW_TRANSACTION_SERIALIZED
 
-        val satoshiAmount = Coin.valueOf(data.SW_TRANSFER_FUNDS_AMOUNT)
-        val previousTransaction = Transaction(
-            walletManager.params,
-            oldTransaction.hexToBytes()
-        )
         val receiverAddress = Address.fromString(
             walletManager.params,
             data.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
         )
+        val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
         return walletManager.safeSigningTransactionFromMultiSig(
-            previousTransaction,
+            oldTransaction,
+            CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
+            transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
+            transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             walletManager.protocolECKey(),
             receiverAddress,
-            satoshiAmount
+            data.SW_TRANSFER_FUNDS_AMOUNT
         )
     }
 

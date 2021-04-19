@@ -1,20 +1,21 @@
 package nl.tudelft.trustchain.currencyii.util
 
+import android.content.Context
 import android.util.Log
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.android.IPv8Android
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
+import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
-import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.TrustChainHelper
 import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
-import org.bitcoinj.core.Coin
+import nl.tudelft.trustchain.currencyii.util.taproot.CTransaction
+import nl.tudelft.trustchain.currencyii.util.taproot.MuSig
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.Transaction
-import java.util.concurrent.TimeUnit
+import java.math.BigInteger
 
 class DAOTransferFundsHelper {
     private fun getTrustChainCommunity(): TrustChainCommunity {
@@ -32,46 +33,46 @@ class DAOTransferFundsHelper {
      */
     fun proposeTransferFunds(
         myPeer: Peer,
-        mostRecentWallet: TrustChainBlock,
+        mostRecentWalletBlock: TrustChainBlock,
         receiverAddressSerialized: String,
         satoshiAmount: Long
     ): SWTransferFundsAskTransactionData {
-        val walletData = SWJoinBlockTransactionData(mostRecentWallet.transaction).getData()
-        val walletHash = mostRecentWallet.calculateHash().toHex()
+        val mostRecentBlockHash = mostRecentWalletBlock.calculateHash().toHex()
+        val blockData = SWJoinBlockTransactionData(mostRecentWalletBlock.transaction).getData()
 
-        val total = walletData.SW_BITCOIN_PKS.size
+        val total = blockData.SW_BITCOIN_PKS.size
         val requiredSignatures =
-            SWUtil.percentageToIntThreshold(total, walletData.SW_VOTING_THRESHOLD)
+            SWUtil.percentageToIntThreshold(total, blockData.SW_VOTING_THRESHOLD)
 
         val proposalID = SWUtil.randomUUID()
 
         var askSignatureBlockData = SWTransferFundsAskTransactionData(
-            walletData.SW_UNIQUE_ID,
-            walletHash,
+            blockData.SW_UNIQUE_ID,
+            mostRecentBlockHash,
             requiredSignatures,
             satoshiAmount,
-            walletData.SW_BITCOIN_PKS,
+            blockData.SW_BITCOIN_PKS,
             receiverAddressSerialized,
             "",
             proposalID,
-            walletData.SW_TRANSACTION_SERIALIZED
+            blockData.SW_TRANSACTION_SERIALIZED
         )
 
-        for (swParticipantPk in walletData.SW_TRUSTCHAIN_PKS) {
+        for (swParticipantPk in blockData.SW_TRUSTCHAIN_PKS) {
             Log.i(
                 "Coin",
-                "Sending TRANSFER proposal (total: ${walletData.SW_TRUSTCHAIN_PKS.size}) to $swParticipantPk"
+                "Sending TRANSFER proposal (total: ${blockData.SW_TRUSTCHAIN_PKS.size}) to $swParticipantPk"
             )
             askSignatureBlockData = SWTransferFundsAskTransactionData(
-                walletData.SW_UNIQUE_ID,
-                walletHash,
+                blockData.SW_UNIQUE_ID,
+                mostRecentBlockHash,
                 requiredSignatures,
                 satoshiAmount,
-                walletData.SW_BITCOIN_PKS,
+                blockData.SW_BITCOIN_PKS,
                 receiverAddressSerialized,
                 swParticipantPk,
                 proposalID,
-                walletData.SW_TRANSACTION_SERIALIZED
+                blockData.SW_TRANSACTION_SERIALIZED
             )
 
             trustchain.createProposalBlock(
@@ -88,45 +89,44 @@ class DAOTransferFundsHelper {
      */
     fun transferFunds(
         myPeer: Peer,
-        transferFundsData: SWTransferFundsAskTransactionData,
-        walletData: SWJoinBlockTD,
-        serializedSignatures: List<String>,
+        walletBlockData: TrustChainTransaction,
+        blockData: SWTransferFundsAskBlockTD,
+        signatures: List<String>,
         receiverAddress: String,
-        satoshiAmount: Long,
-        progressCallback: ((progress: Double) -> Unit)? = null,
-        timeout: Long = CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT
+        paymentAmount: Long,
+        context: Context
     ) {
+        val oldWalletBlockData = SWTransferDoneTransactionData(walletBlockData)
+        val newTransactionSerialized = blockData.SW_TRANSACTION_SERIALIZED
+
         val walletManager = WalletManagerAndroid.getInstance()
-        val bitcoinTransaction =
-            Transaction(walletManager.params, walletData.SW_TRANSACTION_SERIALIZED.hexToBytes())
 
-        val signatures = serializedSignatures.map {
-            ECKey.ECDSASignature.decodeFromDER(it.hexToBytes())
+        val signaturesOfOldOwners = signatures.map {
+            BigInteger(1, it.hexToBytes())
         }
 
-        val transactionBroadcast = walletManager.safeSendingTransactionFromMultiSig(
-            bitcoinTransaction,
-            signatures,
+        val noncePoints = oldWalletBlockData.getData().SW_NONCE_PKS.map {
+            ECKey.fromPublicOnly(it.hexToBytes())
+        }
+
+        val (aggregateNoncePoint, _) = MuSig.aggregate_schnorr_nonces(noncePoints)
+
+        val (status, serializedTransaction) = walletManager.safeSendingTransactionFromMultiSig(
+            signaturesOfOldOwners,
+            aggregateNoncePoint,
+            newTransactionSerialized,
             org.bitcoinj.core.Address.fromString(walletManager.params, receiverAddress),
-            Coin.valueOf(satoshiAmount)
+            paymentAmount,
+            context
         )
 
-        if (progressCallback != null) {
-            transactionBroadcast.setProgressCallback { progress ->
-                progressCallback(progress)
-            }
+        if (status) {
+            Log.i("Coin", "succesfully submitted taproot transaction to server")
+        } else {
+            Log.e("Coin", "taproot transaction submission to server failed")
         }
 
-        val transaction = transactionBroadcast.broadcast().get(timeout, TimeUnit.SECONDS)
-        val serializedTransaction = CoinCommunity.getSerializedTransaction(transaction)
-
-        // Publish the result on trust chain, if no errors were thrown during transaction initialization.
-        broadcastTransferFundSuccessful(
-            myPeer,
-            walletData,
-            transferFundsData,
-            serializedTransaction
-        )
+        broadcastTransferFundSuccessful(myPeer, oldWalletBlockData, serializedTransaction)
     }
 
     /**
@@ -134,42 +134,21 @@ class DAOTransferFundsHelper {
      */
     private fun broadcastTransferFundSuccessful(
         myPeer: Peer,
-        walletData: SWJoinBlockTD,
-        initialData: SWTransferFundsAskTransactionData,
-        transactionSerialized: String
+        oldBlockData: SWTransferDoneTransactionData,
+        serializedTransaction: String
     ) {
-        val initialBlockData = initialData.getData()
+        val newData = SWTransferDoneTransactionData(oldBlockData.jsonData)
+        val walletManager = WalletManagerAndroid.getInstance()
 
-        val transactionData = SWTransferDoneTransactionData(
-            initialBlockData.SW_UNIQUE_ID,
-            transactionSerialized,
-            initialBlockData.SW_TRANSFER_FUNDS_AMOUNT,
-            initialBlockData.SW_BITCOIN_PKS,
-            initialBlockData.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
-        )
+        newData.addBitcoinPk(walletManager.networkPublicECKeyHex())
+        newData.addTrustChainPk(myPeer.publicKey.keyToBin().toHex())
+        newData.setTransactionSerialized(serializedTransaction)
+        newData.addNoncePk(walletManager.nonceECPointHex())
 
-        val shareData = SWJoinBlockTransactionData(
-            walletData.SW_ENTRANCE_FEE,
-            transactionSerialized,
-            walletData.SW_VOTING_THRESHOLD,
-            walletData.SW_TRUSTCHAIN_PKS,
-            walletData.SW_BITCOIN_PKS,
-            walletData.SW_NONCE_PKS,
-            walletData.SW_UNIQUE_ID
-        )
-
-        // Broadcast transfer funds results
         trustchain.createProposalBlock(
-            transactionData.getJsonString(),
+            newData.getJsonString(),
             myPeer.publicKey.keyToBin(),
-            transactionData.blockType
-        )
-
-        // Broadcast new wallet data (containing newest serialized transaction
-        trustchain.createProposalBlock(
-            shareData.getJsonString(),
-            myPeer.publicKey.keyToBin(),
-            shareData.blockType
+            newData.blockType
         )
     }
 
@@ -180,41 +159,36 @@ class DAOTransferFundsHelper {
         fun transferFundsBlockReceived(
             oldTransactionSerialized: String,
             block: TrustChainBlock,
+            transferBlock: SWTransferDoneBlockTD,
             myPublicKey: ByteArray,
             votedInFavor: Boolean
         ) {
             val trustchain = TrustChainHelper(IPv8Android.getInstance().getOverlay() ?: return)
-            val walletManager = WalletManagerAndroid.getInstance()
             val blockData = SWTransferFundsAskTransactionData(block.transaction).getData()
 
-            Log.i(
-                "Coin",
-                "Signature request for transfer funds: ${blockData.SW_RECEIVER_PK}, me: ${myPublicKey.toHex()}"
-            )
+            Log.i("Coin", "Signature request for transfer funds: ${blockData.SW_RECEIVER_PK}, me: ${myPublicKey.toHex()}")
 
             if (blockData.SW_RECEIVER_PK != myPublicKey.toHex()) {
                 return
             }
 
             Log.i("Coin", "Signing transfer funds transaction: $blockData")
-            val satoshiAmount = Coin.valueOf(blockData.SW_TRANSFER_FUNDS_AMOUNT)
-            val previousTransaction = Transaction(
-                walletManager.params,
-                oldTransactionSerialized.hexToBytes()
-            )
-            val receiverAddress = org.bitcoinj.core.Address.fromString(
-                walletManager.params,
-                blockData.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
-            )
 
+            val walletManager = WalletManagerAndroid.getInstance()
+
+            val newTransactionSerialized = blockData.SW_TRANSACTION_SERIALIZED
             val signature = walletManager.safeSigningTransactionFromMultiSig(
-                previousTransaction,
+                oldTransactionSerialized,
+                CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
+                transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
+                transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
                 walletManager.protocolECKey(),
-                receiverAddress,
-                satoshiAmount
+                org.bitcoinj.core.Address.fromString(walletManager.params, blockData.SW_TRANSFER_FUNDS_TARGET_SERIALIZED),
+                blockData.SW_TRANSFER_FUNDS_AMOUNT
             )
 
-            val signatureSerialized = signature.encodeToDER().toHex()
+            val signatureSerialized = signature.toByteArray().toHex()
+
             if (votedInFavor) {
                 val agreementData = SWResponseSignatureTransactionData(
                     blockData.SW_UNIQUE_ID,
