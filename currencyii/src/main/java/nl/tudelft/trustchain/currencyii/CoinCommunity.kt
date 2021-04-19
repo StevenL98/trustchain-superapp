@@ -74,15 +74,15 @@ class CoinCommunity : Community() {
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>,
-        context: Context
+        signatures: List<String>//,
+        //context: Context
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures,
-            context
+            signatures//,
+            //context
         )
     }
 
@@ -111,8 +111,8 @@ class CoinCommunity : Community() {
         blockData: SWTransferFundsAskBlockTD,
         signatures: List<String>,
         receiverAddress: String,
-        satoshiAmount: Long,
-        context: Context
+        satoshiAmount: Long//,
+        //context: Context
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
@@ -120,8 +120,8 @@ class CoinCommunity : Community() {
             blockData,
             signatures,
             receiverAddress,
-            satoshiAmount,
-            context
+            satoshiAmount//,
+            //context
         )
     }
 
@@ -385,10 +385,9 @@ class CoinCommunity : Community() {
             walletManager.params,
             data.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
         )
-        val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
+//        val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
         return walletManager.safeSigningTransactionFromMultiSig(
             oldTransaction,
-            CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
             transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             walletManager.protocolECKey(),
