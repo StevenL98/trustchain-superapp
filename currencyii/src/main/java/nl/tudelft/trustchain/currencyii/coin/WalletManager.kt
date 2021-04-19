@@ -12,7 +12,9 @@ import info.blockchain.api.APIException
 import info.blockchain.api.blockexplorer.BlockExplorer
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.NONCE_KEY
+import nl.tudelft.trustchain.currencyii.CurrencyIIMainActivity
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
@@ -37,6 +39,7 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.experimental.and
 
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
@@ -47,6 +50,7 @@ const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
 // const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
+
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
@@ -266,6 +270,9 @@ class WalletManager(
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
 
+        Log.i("YEET", "txid: " + req.tx.txId.toString())
+        Log.i("YEET", "serialized tx: " + req.tx.bitcoinSerialize().toHex())
+
         return sendTransaction(req.tx)
     }
 
@@ -288,6 +295,7 @@ class WalletManager(
 
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
+
         val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
@@ -298,6 +306,7 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(newKeys)
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
+
         val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
@@ -306,7 +315,7 @@ class WalletManager(
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(newMultiSignatureOutputMoney, org.bitcoinj.core.Address.fromString(params, addressMuSig))
 
-        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs[0]) // is 0 correct?
+        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs.filter { it.scriptBytes.size == 35 }[0])
         multisigInput.disconnect()
 
         val req = SendRequest.forTx(newTransaction)
@@ -314,11 +323,8 @@ class WalletManager(
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
 
-        Log.i("Coin", "Coin: output (1) -> we are adding the final new multi-sig output.")
-
-        Log.i("Coin", "Coin: input (1) -> we are adding the old multi-sig as input.")
-
-        Log.i("Coin", "Coin: use SendRequest to add our entranceFee inputs & change address.")
+        Log.i("YEET", "newtxid: " + req.tx.txId.toString())
+        Log.i("YEET", "serialized new tx: " + req.tx.bitcoinSerialize().toHex())
 
         return TransactionPackage(
             newTransaction.bitcoinSerialize().toHex()
@@ -346,11 +352,25 @@ class WalletManager(
 
         val detKey = key as DeterministicKey
 
-        val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
+        val yeet = detKey.privKey
+        Log.i("YEET", "privkey: $yeet")
 
-        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = 0)
+        val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(
+            Schnorr.n
+        )
 
-        return MuSig.sign_musig(ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(nonces).first, aggPubKey, sighashMuSig)
+        val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
+
+        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
+        val signature = MuSig.sign_musig(
+            ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
+                nonces
+            ).first, aggPubKey, sighashMuSig
+        )
+
+        Log.i("YEET", "nonce_key priv: " + NONCE_KEY.first.privKey.toString())
+
+        return signature
     }
 
     /**
@@ -373,12 +393,22 @@ class WalletManager(
 
         val aggregateSignature = MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
 
+        val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
+
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(cTxInWitness))
+        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //TODO probably correct that there are only 2 inputs
+        cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
 
-        return Pair(sendTaprootTransaction(newTransaction, context), newTransaction.serialize().toHex())
+        val yeet = Transaction(params, newTransaction.serialize())
+        print(yeet)
+
+        val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
+
+        return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
+
+//        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
     /**
@@ -465,22 +495,22 @@ class WalletManager(
         val yeet = transaction.serialize().toHex()
         print(yeet)
 
-        val queue = Volley.newRequestQueue(context)
-        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
-
-        val stringRequest = StringRequest(
-            Request.Method.GET, url,
-            {
-                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
-                Log.i("YEET", it)
-                Thread.sleep(500)
-            },
-            { error ->
-                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
-                Log.i("YEET", error.toString())
-            })
-
-        queue.add(stringRequest)
+//        val context = // todo
+//
+//        val queue = Volley.newRequestQueue(context)
+//        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
+//
+//        val stringRequest = StringRequest(
+//            Request.Method.GET, url,
+//            {
+//                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
+//                Thread.sleep(500)
+//            },
+//            { error ->
+//                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
+//            })
+//
+//        queue.add(stringRequest)
 
         return true
     }
@@ -493,6 +523,9 @@ class WalletManager(
         Log.i("Coin", "Coin: (sendTransaction start).")
         Log.i("Coin", "Coin: txId: ${transaction.txId}")
 //        printTransactionInformation(transaction)
+
+        val yeet = transaction.bitcoinSerialize().toHex()
+        print(yeet)
 
         Log.i("Coin", "Waiting for $MIN_BLOCKCHAIN_PEERS peers")
         Log.i("Coin", "There are currently ${kit.peerGroup().connectedPeers.size} peers")

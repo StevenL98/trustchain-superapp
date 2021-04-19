@@ -111,9 +111,15 @@ class CTransaction(
             ssBuf += littleEndian(txTo.nLockTime)
 
             if ((hash_type and SIGHASH_ANYONECANPAY) != 1.toByte()) {
-                ssBuf += sha256(txTo.vin.map { it.prevout.serialize() }[0])
-
                 var temp: ByteArray = byteArrayOf()
+
+                for (i in txTo.vin) {
+                    temp += i.prevout.serialize()
+                }
+
+                ssBuf += sha256(temp)
+
+                temp = byteArrayOf()
                 for (u in spentUtxos) {
                     temp += littleEndian(u.nValue)
                 }
@@ -121,7 +127,7 @@ class CTransaction(
 
                 temp = byteArrayOf()
                 for (i in txTo.vin) {
-                    temp += littleEndian(i.nSequence.toUInt())
+                    temp += littleEndian(i.nSequence)
                 }
                 ssBuf += sha256(temp)
             }
@@ -233,7 +239,7 @@ class CTxIn(
         var r: ByteArray = byteArrayOf()
         r += prevout.serialize()
         r += Messages.serString(scriptSig)
-        r += littleEndian(nSequence.toUInt())
+        r += littleEndian(nSequence)
         return r
     }
 
@@ -246,6 +252,12 @@ class CTxIn(
         return this
     }
 }
+
+fun ByteArray.getUIntAt(idx: Int) =
+    ((this[idx].toUInt() and 0xFFu) shl 24) or
+        ((this[idx + 1].toUInt() and 0xFFu) shl 16) or
+        ((this[idx + 2].toUInt() and 0xFFu) shl 8) or
+        (this[idx + 3].toUInt() and 0xFFu)
 
 class CTxOut(
     var nValue: Long = 0,
@@ -308,7 +320,7 @@ class CTxWitness(
 fun littleEndian(uint: UInt): ByteArray {
     val bb: ByteBuffer = ByteBuffer.allocate(4)
     bb.order(ByteOrder.LITTLE_ENDIAN)
-    bb.put(uint.toByte())
+    bb.putInt(uint.toInt())
     return bb.array()
 }
 
