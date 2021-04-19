@@ -270,6 +270,9 @@ class WalletManager(
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
 
+        Log.i("YEET", "txid: " + req.tx.txId.toString())
+        Log.i("YEET", "serialized tx: " + req.tx.bitcoinSerialize().toHex())
+
         return sendTransaction(req.tx)
     }
 
@@ -321,11 +324,8 @@ class WalletManager(
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
 
-        Log.i("Coin", "Coin: output (1) -> we are adding the final new multi-sig output.")
-
-        Log.i("Coin", "Coin: input (1) -> we are adding the old multi-sig as input.")
-
-        Log.i("Coin", "Coin: use SendRequest to add our entranceFee inputs & change address.")
+        Log.i("YEET", "newtxid: " + req.tx.txId.toString())
+        Log.i("YEET", "serialized new tx: " + req.tx.bitcoinSerialize().toHex())
 
         return TransactionPackage(
             newTransaction.bitcoinSerialize().toHex()
@@ -353,6 +353,9 @@ class WalletManager(
 
         val detKey = key as DeterministicKey
 
+        val yeet = detKey.privKey
+        Log.i("YEET", "privkey: $yeet")
+
         val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(
             Schnorr.n
         )
@@ -360,12 +363,13 @@ class WalletManager(
         val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
 
         val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
-
         val signature = MuSig.sign_musig(
             ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
                 nonces
             ).first, aggPubKey, sighashMuSig
         )
+
+        Log.i("YEET", "nonce_key priv: " + NONCE_KEY.first.privKey.toString())
 
         return signature
     }
@@ -392,10 +396,16 @@ class WalletManager(
             aggregateNonce
         )
 
+        val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
+
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(cTxInWitness))
+        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //TODO probably correct that there are only 2 inputs
+        cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
+
+        val yeet = Transaction(params, newTransaction.serialize())
+        print(yeet)
 
         val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
 
