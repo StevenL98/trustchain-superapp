@@ -313,6 +313,7 @@ class WalletManager(
         printTransactionInformation(req.tx)
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
+        //todo fuck the fees, laten we dit gwn beunen zoals ik bij transfer funds doe
 
         Log.i("YEET", "newtxid: " + req.tx.txId.toString())
         Log.i("YEET", "serialized new tx: " + req.tx.bitcoinSerialize().toHex())
