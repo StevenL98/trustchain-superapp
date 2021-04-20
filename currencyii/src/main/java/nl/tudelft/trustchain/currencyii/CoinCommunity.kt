@@ -39,16 +39,12 @@ class CoinCommunity : Community() {
      */
     fun createBitcoinGenesisWallet(
         entranceFee: Long,
-        threshold: Int,
-        progressCallback: ((progress: Double) -> Unit)? = null,
-        timeout: Long = DEFAULT_BITCOIN_MAX_TIMEOUT
+        threshold: Int
     ) {
         daoCreateHelper.createBitcoinGenesisWallet(
             myPeer,
             entranceFee,
-            threshold,
-            progressCallback,
-            timeout
+            threshold
         )
     }
 
@@ -74,15 +70,13 @@ class CoinCommunity : Community() {
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>//,
-        //context: Context
+        signatures: List<String>
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures//,
-            //context
+            signatures
         )
     }
 
@@ -111,8 +105,7 @@ class CoinCommunity : Community() {
         blockData: SWTransferFundsAskBlockTD,
         signatures: List<String>,
         receiverAddress: String,
-        satoshiAmount: Long//,
-        //context: Context
+        satoshiAmount: Long
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
@@ -120,8 +113,7 @@ class CoinCommunity : Community() {
             blockData,
             signatures,
             receiverAddress,
-            satoshiAmount//,
-            //context
+            satoshiAmount
         )
     }
 
@@ -226,14 +218,13 @@ class CoinCommunity : Community() {
      * Fetch all DAO blocks that contain a signature. These blocks are the response of a signature request.
      * Signatures are fetched from [SIGNATURE_AGREEMENT_BLOCK] type blocks.
      */
-    fun fetchProposalSignatures(walletId: String, proposalId: String): List<String> {
+    fun fetchProposalSignatures(walletId: String, proposalId: String): List<SWResponseSignatureBlockTD> {
         return getTrustChainCommunity().database.getBlocksWithType(SIGNATURE_AGREEMENT_BLOCK)
             .filter {
                 val blockData = SWResponseSignatureTransactionData(it.transaction)
                 blockData.matchesProposal(walletId, proposalId)
             }.map {
-                val blockData = SWResponseSignatureTransactionData(it.transaction).getData()
-                blockData.SW_SIGNATURE_SERIALIZED
+                SWResponseSignatureTransactionData(it.transaction).getData()
             }
     }
 
@@ -241,7 +232,7 @@ class CoinCommunity : Community() {
      * Fetch all DAO blocks that contain a negative signature. These blocks are the response of a negative signature request.
      * Signatures are fetched from [SIGNATURE_AGREEMENT_NEGATIVE_BLOCK] type blocks.
      */
-    fun fetchNegativeProposalSignatures(walletId: String, proposalId: String): List<String> {
+    fun fetchNegativeProposalSignatures(walletId: String, proposalId: String): List<SWResponseNegativeSignatureBlockTD> {
         return getTrustChainCommunity().database.getBlocksWithType(
             SIGNATURE_AGREEMENT_NEGATIVE_BLOCK
         )
@@ -249,8 +240,7 @@ class CoinCommunity : Community() {
                 val blockData = SWResponseNegativeSignatureTransactionData(it.transaction)
                 blockData.matchesProposal(walletId, proposalId)
             }.map {
-                val blockData = SWResponseNegativeSignatureTransactionData(it.transaction).getData()
-                blockData.SW_SIGNATURE_SERIALIZED
+                SWResponseNegativeSignatureTransactionData(it.transaction).getData()
             }
     }
 
@@ -385,7 +375,7 @@ class CoinCommunity : Community() {
             walletManager.params,
             data.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
         )
-//        val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
+
         return walletManager.safeSigningTransactionFromMultiSig(
             oldTransaction,
             transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },

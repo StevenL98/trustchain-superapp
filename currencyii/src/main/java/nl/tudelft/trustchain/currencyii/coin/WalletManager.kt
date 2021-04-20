@@ -2,6 +2,11 @@ package nl.tudelft.trustchain.currencyii.coin
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
+import com.android.volley.Request
+import com.android.volley.toolbox.RequestFuture
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.common.base.Joiner
 import com.google.gson.JsonParser
 import info.blockchain.api.APIException
@@ -30,11 +35,14 @@ import org.bitcoinj.wallet.KeyChainGroupStructure
 import org.bitcoinj.wallet.SendRequest
 import org.bouncycastle.math.ec.ECPoint
 import java.io.File
+import java.lang.Exception
 import java.math.BigInteger
+import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.URL
 import java.net.UnknownHostException
 import java.util.*
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.experimental.and
 
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
@@ -44,9 +52,25 @@ const val MIN_BLOCKCHAIN_PEERS_TEST_NET = 5
 const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
-// const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
+ const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
+
+// TODO refactor javadoc (make sure it's up to date) and add useful logging (also for other classes)
+
+// TODO disable MAINNET and TESTNET buttons and add disclaimer to not send or use real bitcoins
+
+// TODO Nonce per dao and refresh (this is fixed after steven merges his branch)
+
+// TODO after signing, go back to previous screen
+
+// TODO use both transfer fund and join block to determine DAO balance (currently only join block)
+
+// TODO bug: after transfer fund, join doesnt work
+
+// TODO tests
+
+// TODO test different emulators joining mutual dao and sending funds
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
@@ -231,13 +255,7 @@ class WalletManager(
      */
     fun safeCreationAndSendGenesisWallet(
         entranceFee: Coin
-    ): TransactionBroadcast {
-        Log.i("Coin", "Coin: (safeCreationAndSendGenesisWallet start).")
-
-        Log.i("Coin", "Coin: we are making a new genesis wallet for us alone.")
-
-        Log.i("Coin", "Coin: we will now make a 1/1 wallet")
-
+    ): Pair<Boolean, String> {
         val (_, aggPubKey) = MuSig.generate_musig_key(listOf(protocolECKey()))
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
@@ -250,12 +268,10 @@ class WalletManager(
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
         val transaction = Transaction(params)
-        // Add an output with the entrance fee & MuSig address.
+
         transaction.addOutput(
             entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig)
         )
-
-        Log.i("Coin", "Coin: use SendRequest to add our entranceFee input & change address.")
 
         val req = SendRequest.forTx(transaction)
         req.changeAddress = protocolAddress()
@@ -264,7 +280,9 @@ class WalletManager(
         Log.i("YEET", "txid: " + req.tx.txId.toString())
         Log.i("YEET", "serialized tx: " + req.tx.bitcoinSerialize().toHex())
 
-        return sendTransaction(req.tx)
+        val serializedTransaction = req.tx.bitcoinSerialize()
+
+        return Pair(sendTaprootTransaction(CTransaction().deserialize(serializedTransaction)), serializedTransaction.toHex())
     }
 
     /**
@@ -279,18 +297,13 @@ class WalletManager(
         networkPublicHexKeys: List<String>,
         entranceFee: Coin,
         oldTransactionSerialized: String
-    ): TransactionPackage {
-        Log.i("Coin", "Coin: (safeCreationJoinWalletTransaction start).")
-
-        Log.i("Coin", "Coin: making a transaction with you in it for everyone to sign.")
-
+    ): String {
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
 
         val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
-            Log.i("Coin", "Coin: de-serializing key $publicHexKey.")
             ECKey.fromPublicOnly(publicHexKey.hexToBytes())
         }
 
@@ -302,7 +315,6 @@ class WalletManager(
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
-        // Calculate the final amount of coins (old coins + entrance fee) that will be the new multi-sig.
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(newMultiSignatureOutputMoney, org.bitcoinj.core.Address.fromString(params, addressMuSig))
 
@@ -310,17 +322,13 @@ class WalletManager(
         multisigInput.disconnect()
 
         val req = SendRequest.forTx(newTransaction)
-        printTransactionInformation(req.tx)
         req.changeAddress = protocolAddress()
         kit.wallet().completeTx(req)
-        //todo fuck the fees, laten we dit gwn beunen zoals ik bij transfer funds doe
 
         Log.i("YEET", "newtxid: " + req.tx.txId.toString())
         Log.i("YEET", "serialized new tx: " + req.tx.bitcoinSerialize().toHex())
 
-        return TransactionPackage(
-            newTransaction.bitcoinSerialize().toHex()
-        )
+        return newTransaction.bitcoinSerialize().toHex()
     }
 
     /**
@@ -338,8 +346,6 @@ class WalletManager(
         nonces: List<ECKey>,
         key: ECKey
     ): BigInteger {
-        Log.i("Coin", "Coin: (safeSigningJoinWalletTransaction start).")
-
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
 
         val detKey = key as DeterministicKey
@@ -376,8 +382,7 @@ class WalletManager(
     fun safeSendingJoinWalletTransaction(
         signaturesOfOldOwners: List<BigInteger>,
         aggregateNonce: ECPoint,
-        newTransaction: CTransaction//,
-        //context: Context
+        newTransaction: CTransaction
     ): Pair<Boolean, String> {
         Log.i("Coin", "Coin: (safeSendingJoinWalletTransaction start).")
         Log.i("Coin", "Coin: make the new final transaction for the new wallet.")
@@ -388,19 +393,12 @@ class WalletManager(
         val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) // TODO probably correct that there are only 2 inputs
+        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //our transactions only have 2 inputs
         cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
 
-        val yeet = Transaction(params, newTransaction.serialize())
-        print(yeet)
-
-        val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
-        //println(context)
-        return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
-
-//        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
+        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
     /**
@@ -421,8 +419,6 @@ class WalletManager(
         receiverAddress: org.bitcoinj.core.Address,
         paymentAmount: Long
     ): BigInteger {
-        Log.i("Coin", "Coin: (safeSigningTransactionFromMultiSig start).")
-
         val detKey = key as DeterministicKey
 
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
@@ -458,11 +454,8 @@ class WalletManager(
         aggregateNonce: ECPoint,
         oldTransactionSerialized: String,
         receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Long//,
-//        context: Context
+        paymentAmount: Long
     ): Pair<Boolean, String> {
-        Log.i("Coin", "Coin: (safeSendingTransactionFromMultiSig start).")
-
         val (_, aggPubKey) = MuSig.generate_musig_key(publicKeys)
         val pubKeyDataMuSig = aggPubKey.getEncoded(true)
 
@@ -475,11 +468,7 @@ class WalletManager(
 
         newTransaction.wit = cTxWitness
 
-        val transaction = sendTransaction(Transaction(params, newTransaction.serialize())).broadcast().get(CoinCommunity.DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
-
-        return Pair(true, CoinCommunity.getSerializedTransaction(transaction))
-
-//        return Pair(sendTaprootTransaction(newTransaction, context), newTransaction.serialize().toHex())
+        return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
     private fun constructNewTransaction(oldTransactionSerialized: String, pubKeyDataMuSig: ByteArray, paymentAmount: Long, receiverAddress: org.bitcoinj.core.Address): Pair<CTransaction, CTransaction> {
@@ -498,344 +487,38 @@ class WalletManager(
 
         val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
-        newTransaction.addOutput(Coin.valueOf(oldMultiSignatureOutput - paymentAmount), org.bitcoinj.core.Address.fromString(params, addressMuSig)) //todo probably subtract fees or something idk
+        newTransaction.addOutput(Coin.valueOf(oldMultiSignatureOutput - paymentAmount), org.bitcoinj.core.Address.fromString(params, addressMuSig))
 
         val newCTx = CTransaction().deserialize(newTransaction.bitcoinSerialize())
         return Pair(oldTransaction, newCTx)
     }
 
-    private fun sendTaprootTransaction(transaction: CTransaction, context: Context): Boolean {
-        // TODO: submit serialized transaction string to python server
+    private fun sendTaprootTransaction(transaction: CTransaction): Boolean {
         Log.i("YEET", "transaction serialized: ${transaction.serialize().toHex()}")
+        val url = URL("https://$REG_TEST_FAUCET_DOMAIN/generateBlock?tx_id=${transaction.serialize().toHex()}")
 
-        val yeet = transaction.serialize().toHex()
-        print(yeet)
+        val executor: ExecutorService = Executors.newCachedThreadPool(Executors.defaultThreadFactory())
 
-        print(context) //todo remove
+        val future: Future<Boolean> = executor.submit(object : Callable<Boolean> {
+            override fun call(): Boolean {
+                val connection = url.openConnection() as HttpURLConnection
 
-//        val context = // todo
-//
-//        val queue = Volley.newRequestQueue(context)
-//        val url = "https://$REG_TEST_FAUCET_IP/generateBlock?tx_id=${transaction.serialize().toHex()}"
-//
-//        val stringRequest = StringRequest(
-//            Request.Method.GET, url,
-//            {
-//                Toast.makeText(context, "YEEEEEEEEEEEEET", Toast.LENGTH_SHORT).show()
-//                Thread.sleep(500)
-//            },
-//            { error ->
-//                Toast.makeText(context, error.toString(), Toast.LENGTH_SHORT).show()
-//            })
-//
-//        queue.add(stringRequest)
+                try {
+                    return connection.responseCode == 200
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        })
 
-        return true
-    }
-
-    /**
-     * Helper method to send transaction with logs and progress logs.
-     * @param transaction transaction
-     */
-    private fun sendTransaction(transaction: Transaction): TransactionBroadcast {
-        Log.i("Coin", "Coin: (sendTransaction start).")
-        Log.i("Coin", "Coin: txId: ${transaction.txId}")
-//        printTransactionInformation(transaction)
-
-        val yeet = transaction.bitcoinSerialize().toHex()
-        print(yeet)
-
-        Log.i("Coin", "Waiting for $MIN_BLOCKCHAIN_PEERS peers")
-        Log.i("Coin", "There are currently ${kit.peerGroup().connectedPeers.size} peers")
-        kit.peerGroup().waitForPeers(MIN_BLOCKCHAIN_PEERS).get()
-        Log.i("Coin", "Got >= $MIN_BLOCKCHAIN_PEERS peers: ${kit.peerGroup().connectedPeers}")
-        Log.i(
-            "Coin",
-            "Transaction broadcast setup ${transaction.txId} completed. Not broadcasted yet."
-        )
-        return kit.peerGroup().broadcastTransaction(transaction)
-    }
-
-    /**
-     * Helper method to get the multi-sig output from a transaction.
-     * NOTE: make sure that there is an actual multi-sig output!
-     * @param transaction transaction with multi-sig output.
-     * @return the multi-sig output
-     */
-    fun getMuSigOutput(transaction: Transaction): MuSigOutputMeta {
-        val multiSigOutputs = mutableListOf<TransactionOutput>()
-        transaction.outputs.forEach { output ->
-            multiSigOutputs.add(output)
+        return try {
+            future.get(10, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            false
         }
-
-        // TODO check if program in multisig is same as program of musig agg pubkey
-        val multiSigOutput = multiSigOutputs[0]
-
-        return MuSigOutputMeta(
-            multiSigOutput.value,
-            multiSigOutput.index,
-            multiSigOutput
-        )
-    }
-
-    /**
-     * Helper method to attempt to get the transaction from a transaction ID
-     * and return serialized version.
-     * @param transactionId transactionId
-     * @return null if not available in your wallet yet, else serialized version of transaction.
-     */
-    fun attemptToGetTransactionAndSerialize(transactionId: String): String? {
-        val transaction = kit.wallet().getTransaction(Sha256Hash.wrap(transactionId))
-        if (transaction != null) {
-            Log.i("Coin", "Transaction (attemptToGetTransactionAndSerialize) $transaction found")
-            val serializedTransaction = transaction.bitcoinSerialize().toHex()
-            return serializedTransaction
-        } else {
-            Log.i(
-                "Coin", "Coin: (attemptToGetTransactionAndSerialize) " +
-                "the transaction $transaction could not be found in your wallet."
-            )
-            return null
-        }
-    }
-
-    /**
-     * Helper method that prints useful information about a transaction.
-     * @param transaction Transaction
-     */
-    private fun printTransactionInformation(transaction: Transaction) {
-        Log.i("Coin", "Coin: ============ Transaction Information ===============")
-        Log.i("Coin", "Coin: txId ${transaction.txId}")
-        Log.i("Coin", "Coin: fee ${transaction.fee}")
-        Log.i("Coin", "Coin: inputs:::")
-        transaction.inputs.forEach {
-            Log.i("Coin", "Coin:    index ${it.index}")
-            Log.i("Coin", "Coin:    value ${it.value}")
-            Log.i("Coin", "Coin:    multi-sig ${ScriptPattern.isSentToMultisig(it.scriptSig)}")
-        }
-        Log.i("Coin", "Coin: outputs:::")
-        transaction.outputs.forEach {
-            Log.i("Coin", "Coin:    index ${it.index}")
-            Log.i("Coin", "Coin:    value ${it.value}")
-            Log.i("Coin", "Coin:    multi-sig ${ScriptPattern.isSentToMultisig(it.scriptPubKey)}")
-        }
-        Log.i("Coin", "Coin: multi-sig output::")
-        val a = getMuSigOutput(transaction)
-        Log.i("Coin", "Coin:    value -> ${a.value}")
-        Log.i("Coin", "Coin: ============ Transaction Information ===============")
-    }
-
-    /**
-     * Creates a MultiSig payment transaction
-     *
-     * The two outputs of this transaction will be one to the receiver address (the payment) and
-     *  one for the residual funds back to the MultiSig address.
-     * Uses a previously created MultiSig output as the input of this transaction.
-     * Optionally, the input MultiSig can be signed using the inputScriptSig field.
-     *
-     * @param receiverAddress: the receiver of the payment
-     * @param paymentAmount: the amount to be transferred/payed to the receiver
-     * @param previousMultiSigOutput: the MultiSig output of the shared wallet, used as new input
-     * @param inputScriptSig: (Optional) the input script (ScriptBuilder.createMultiSigInputScript)
-     *  created using signatures (TransactionSignature) of a transaction made with this method.
-     */
-    private fun createMultiSigPaymentTransaction(
-        receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Coin,
-        previousMultiSigOutput: TransactionOutput,
-        inputScriptSig: Script? = null
-    ): Transaction {
-        // Get multisig script of previous output, which will become the input of this tx
-        val multiSigScript = previousMultiSigOutput.scriptPubKey
-
-        Log.i("Coin", "Coin: making the transaction (again) that will be sent.")
-        val spendTx = Transaction(params)
-        spendTx.addOutput(paymentAmount, receiverAddress)
-        // Use a placeholder value for the residual output. Size of Tx needs to be accurate to estimate fee.
-        val tempResidualOutput = spendTx.addOutput(Coin.valueOf(9999), multiSigScript)
-        // Be careful with adding more inputs!! We assume the first input is the multisig input
-        val input = spendTx.addInput(previousMultiSigOutput)
-
-        // Calculate fee and set the change output corresponding to calculated fee
-        val calculatedFeeValue = CoinUtil.calculateEstimatedTransactionFee(
-            spendTx,
-            params,
-            CoinUtil.TxPriority.LOW_PRIORITY
-        )
-        // Make sure that the fee does not exceed the amount of funds available
-        val calculatedFee =
-            Coin.valueOf(calculatedFeeValue.coerceAtMost((previousMultiSigOutput.value - paymentAmount).value))
-        val residualFunds = previousMultiSigOutput.value - paymentAmount - calculatedFee
-        Log.i(
-            "Coin",
-            "Coin: Setting output for residual funds ${residualFunds.value} based on a calculated fee of $calculatedFee satoshi."
-        )
-
-        tempResidualOutput.value = residualFunds
-
-        // Set input script signatures if passed to the method
-        if (inputScriptSig != null) {
-            input.scriptSig = inputScriptSig
-        }
-
-        return spendTx
-    }
-
-    /**
-     * Wrapper for creating a MultiSig payment transaction without an input signature
-     *
-     * @param receiverAddress: the receiver of the payment
-     * @param paymentAmount: the amount to be transferred/payed to the receiver
-     * @param previousMultiSigOutput: the MultiSig output of the shared wallet, used as new input
-     */
-    fun createMultiSigPaymentTx(
-        receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Coin,
-        previousMultiSigOutput: TransactionOutput
-    ): Transaction {
-        return createMultiSigPaymentTransaction(
-            receiverAddress,
-            paymentAmount,
-            previousMultiSigOutput
-        )
-    }
-
-    /**
-     * Wrapper for creating a MultiSig payment transaction with input signature
-     *
-     * @param receiverAddress: the receiver of the payment
-     * @param paymentAmount: the amount to be transferred/payed to the receiver
-     * @param previousMultiSigOutput: the MultiSig output of the shared wallet, used as new input
-     * @param inputScriptSig: (Optional) the input script (ScriptBuilder.createMultiSigInputScript)
-     *  created using signatures (TransactionSignature) of a transaction made with this method.
-     */
-    fun createMultiSigPaymentTxWithInputSig(
-        receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Coin,
-        previousMultiSigOutput: TransactionOutput,
-        inputScriptSig: Script
-    ): Transaction {
-        return createMultiSigPaymentTransaction(
-            receiverAddress,
-            paymentAmount,
-            previousMultiSigOutput,
-            inputScriptSig
-        )
     }
 
     companion object {
-
-        fun createMultiSignatureWallet(
-            publicKeys: List<ECKey>,
-            entranceFee: Coin,
-            threshold: Int,
-            params: NetworkParameters = MainNetParams.get()
-        ): Transaction {
-            // Prepare a template for the contract.
-            val contract = Transaction(params)
-
-            // Prepare a list of all keys present in contract.
-            val keys = Collections.unmodifiableList(publicKeys)
-
-            // Create a n-n multi-signature output script.
-            val script = ScriptBuilder.createMultiSigOutputScript(threshold, keys)
-
-            // Now add an output with the entrance fee & script.
-            contract.addOutput(entranceFee, script)
-
-            return contract
-        }
-
-        fun checkEntranceFeeTransaction(
-            userBitcoinPk: Address,
-            bitcoinTransactionHash: Sha256Hash,
-            sharedWalletBitcoinPk: Address,
-            entranceFee: Double
-        ): Boolean {
-            // Get transaction from tx hash
-            val blockExplorer = BlockExplorer()
-            val tx = try {
-                blockExplorer.getTransaction(bitcoinTransactionHash.toString())
-            } catch (e: APIException) {
-                // Return false if API Exception is thrown with reason "Transaction not found: (...)"
-                // The library does not support accessing the reason, so use JSON parser to parse message to a JSON object
-                if (e.message !== null) {
-                    val reason = JsonParser().parse(e.message).asJsonObject.get("reason")
-                    if (reason != null) {
-                        if (reason.asString.startsWith("Transaction not found: ")) {
-                            return false
-                        }
-                    }
-                }
-
-                // API Exception was something other than transaction not found, so still throw it
-                throw e
-            }
-
-            // Check block confirmations
-            val blockHeightRelative = blockExplorer.latestBlock.height - tx.blockHeight
-            if (blockHeightRelative < 6) {
-                println("Transaction was not confirmed by at least 6 blocks:  $blockHeightRelative")
-                return false
-            }
-            if (tx.blockHeight < 0) {
-                println("Transaction does not have a valid block height: ${tx.blockHeight}")
-                return false
-            }
-
-            // Check transaction inputs
-            val userBitcoinPkString = userBitcoinPk.toString()
-            var hasCorrectInput = false
-            for (input in tx.inputs) {
-                val inputValue = input.previousOutput.value.toDouble() / 100000000
-                if (userBitcoinPkString.equals(input.previousOutput.address) &&
-                    inputValue >= entranceFee
-                ) {
-                    hasCorrectInput = true
-                    break
-                }
-            }
-
-            if (!hasCorrectInput) {
-                println("Transaction did not have correct inputs")
-                return false
-            }
-
-            // Check transaction outputs
-            val sharedWalletBitcoinPkString = sharedWalletBitcoinPk.toString()
-            var hasCorrectOutput = false
-            for (output in tx.outputs) {
-                val outputValue = output.value.toDouble() / 100000000
-                if (sharedWalletBitcoinPkString.equals(output.address) &&
-                    outputValue >= entranceFee
-                ) {
-                    hasCorrectOutput = true
-                    break
-                }
-            }
-
-            if (!hasCorrectOutput) {
-                println("Transaction did not have correct outputs")
-                return false
-            }
-
-            return true
-        }
-
-        fun privateKeyStringToECKey(
-            privateKey: String,
-            params: NetworkParameters = MainNetParams.get()
-        ): ECKey {
-            return DumpedPrivateKey.fromBase58(params, privateKey).key
-        }
-
-        fun ecKeyToPrivateKeyString(
-            ecKey: ECKey,
-            params: NetworkParameters = MainNetParams.get()
-        ): String {
-            return ecKey.getPrivateKeyAsWiF(params)
-        }
-
         /**
          * A method to create a serialized seed for use in BitcoinJ.
          * @param paramsRaw BitcoinNetworkOptions
@@ -868,14 +551,4 @@ class WalletManager(
         Log.i("Coin", "Coin: Importing key in existing wallet: $privateKey")
         this.kit.wallet().importKey(formatKey(privateKey))
     }
-
-    data class TransactionPackage(
-        val serializedTransaction: String
-    )
-
-    data class MuSigOutputMeta(
-        val value: Coin,
-        val index: Int,
-        val unsignedOutput: TransactionOutput
-    )
 }
