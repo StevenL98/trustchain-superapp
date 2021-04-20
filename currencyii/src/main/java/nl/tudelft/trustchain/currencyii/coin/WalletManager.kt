@@ -2,19 +2,9 @@ package nl.tudelft.trustchain.currencyii.coin
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
-import com.android.volley.Request
-import com.android.volley.toolbox.RequestFuture
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
 import com.google.common.base.Joiner
-import com.google.gson.JsonParser
-import info.blockchain.api.APIException
-import info.blockchain.api.blockexplorer.BlockExplorer
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
-import nl.tudelft.trustchain.currencyii.CoinCommunity
-import nl.tudelft.trustchain.currencyii.NONCE_KEY
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
@@ -27,15 +17,12 @@ import org.bitcoinj.params.MainNetParams
 import org.bitcoinj.params.RegTestParams
 import org.bitcoinj.params.TestNet3Params
 import org.bitcoinj.script.Script
-import org.bitcoinj.script.ScriptBuilder
-import org.bitcoinj.script.ScriptPattern
 import org.bitcoinj.wallet.DeterministicSeed
 import org.bitcoinj.wallet.KeyChainGroup
 import org.bitcoinj.wallet.KeyChainGroupStructure
 import org.bitcoinj.wallet.SendRequest
 import org.bouncycastle.math.ec.ECPoint
 import java.io.File
-import java.lang.Exception
 import java.math.BigInteger
 import java.net.HttpURLConnection
 import java.net.InetAddress
@@ -52,7 +39,7 @@ const val MIN_BLOCKCHAIN_PEERS_TEST_NET = 5
 const val MIN_BLOCKCHAIN_PEERS_REG_TEST = 1
 const val MIN_BLOCKCHAIN_PEERS_PRODUCTION = 5
 const val REG_TEST_FAUCET_IP = "131.180.27.224"
- const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
+const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
@@ -240,8 +227,20 @@ class WalletManager(
         return protocolECKey().publicKeyAsHex
     }
 
-    fun nonceECPointHex(): String {
-        return NONCE_KEY.second.getEncoded(true).toHex()
+    /**
+     * Return the public point of the nonce key
+     * @param swUniqueId - String, the id of the DAO where you want to get the nonce from
+     */
+    fun nonceECPointHex(swUniqueId: String, context: Context): String {
+        return getNonceKey(swUniqueId, context).second.getEncoded(true).toHex()
+    }
+
+    /**
+     * Return the public point of the nonce key
+     * @param - Pair, the private and public key of the nonce
+     */
+    fun nonceECPointHex(nonce: Pair<ECKey, ECPoint>): String {
+        return nonce.second.getEncoded(true).toHex()
     }
 
     /**
@@ -282,7 +281,10 @@ class WalletManager(
 
         val serializedTransaction = req.tx.bitcoinSerialize()
 
-        return Pair(sendTaprootTransaction(CTransaction().deserialize(serializedTransaction)), serializedTransaction.toHex())
+        return Pair(
+            sendTaprootTransaction(CTransaction().deserialize(serializedTransaction)),
+            serializedTransaction.toHex()
+        )
     }
 
     /**
@@ -301,7 +303,8 @@ class WalletManager(
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
 
-        val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
+        val oldMultiSignatureOutput =
+            oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
         val newKeys = networkPublicHexKeys.map { publicHexKey: String ->
             ECKey.fromPublicOnly(publicHexKey.hexToBytes())
@@ -311,14 +314,23 @@ class WalletManager(
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
 
-        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
+        val programMusig =
+            byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
-        newTransaction.addOutput(newMultiSignatureOutputMoney, org.bitcoinj.core.Address.fromString(params, addressMuSig))
+        newTransaction.addOutput(
+            newMultiSignatureOutputMoney,
+            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+        )
 
-        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs.filter { it.scriptBytes.size == 35 }[0])
+        val multisigInput = newTransaction.addInput(
+            Transaction(
+                params,
+                oldTransactionSerialized.hexToBytes()
+            ).outputs.filter { it.scriptBytes.size == 35 }[0]
+        )
         multisigInput.disconnect()
 
         val req = SendRequest.forTx(newTransaction)
@@ -344,7 +356,9 @@ class WalletManager(
         newTransaction: CTransaction,
         publicKeys: List<ECKey>,
         nonces: List<ECKey>,
-        key: ECKey
+        key: ECKey,
+        walletId: String,
+        context: Context
     ): BigInteger {
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
 
@@ -357,16 +371,26 @@ class WalletManager(
             Schnorr.n
         )
 
-        val index = oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
+        val index =
+            oldTransaction.vout.indexOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0])
 
-        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, oldTransaction.vout, SIGHASH_ALL_TAPROOT, input_index = index.toShort())
+        val sighashMuSig = CTransaction.TaprootSignatureHash(
+            newTransaction,
+            oldTransaction.vout,
+            SIGHASH_ALL_TAPROOT,
+            input_index = index.toShort()
+        )
         val signature = MuSig.sign_musig(
-            ECKey.fromPrivate(privChallenge1), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
+            ECKey.fromPrivate(privChallenge1),
+            getNonceKey(walletId, context).first,
+            MuSig.aggregate_schnorr_nonces(
                 nonces
-            ).first, aggPubKey, sighashMuSig
+            ).first,
+            aggPubKey,
+            sighashMuSig
         )
 
-        Log.i("YEET", "nonce_key priv: " + NONCE_KEY.first.privKey.toString())
+        Log.i("YEET", "nonce_key priv: " + getNonceKey(walletId, context).first.privKey.toString())
 
         return signature
     }
@@ -388,12 +412,19 @@ class WalletManager(
         Log.i("Coin", "Coin: make the new final transaction for the new wallet.")
         Log.i("Coin", "Coin: using ${signaturesOfOldOwners.size} signatures.")
 
-        val aggregateSignature = MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
+        val aggregateSignature =
+            MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
 
-        val index = newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
+        val index =
+            newTransaction.vin.indexOf(newTransaction.vin.filter { it.scriptSig.isEmpty() }[0])
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
-        val cTxWitness = CTxWitness(arrayOf(CTxInWitness(), CTxInWitness())) //our transactions only have 2 inputs
+        val cTxWitness = CTxWitness(
+            arrayOf(
+                CTxInWitness(),
+                CTxInWitness()
+            )
+        ) // our transactions only have 2 inputs
         cTxWitness.vtxinwit[index] = cTxInWitness
 
         newTransaction.wit = cTxWitness
@@ -417,22 +448,39 @@ class WalletManager(
         nonces: List<ECKey>,
         key: ECKey,
         receiverAddress: org.bitcoinj.core.Address,
-        paymentAmount: Long
+        paymentAmount: Long,
+        walletId: String,
+        context: Context
     ): BigInteger {
         val detKey = key as DeterministicKey
 
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
         val pubKeyDataMuSig = aggPubKey.getEncoded(true)
 
-        val (oldTransaction, newTransaction) = constructNewTransaction(oldTransactionSerialized, pubKeyDataMuSig, paymentAmount, receiverAddress)
+        val (oldTransaction, newTransaction) = constructNewTransaction(
+            oldTransactionSerialized,
+            pubKeyDataMuSig,
+            paymentAmount,
+            receiverAddress
+        )
 
-        val privChallenge = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
+        val privChallenge =
+            detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
 
-        val sighashMuSig = CTransaction.TaprootSignatureHash(newTransaction, arrayOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0]), SIGHASH_ALL_TAPROOT, input_index = 0)
+        val sighashMuSig = CTransaction.TaprootSignatureHash(
+            newTransaction,
+            arrayOf(oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0]),
+            SIGHASH_ALL_TAPROOT,
+            input_index = 0
+        )
         val signature = MuSig.sign_musig(
-            ECKey.fromPrivate(privChallenge), NONCE_KEY.first, MuSig.aggregate_schnorr_nonces(
+            ECKey.fromPrivate(privChallenge),
+            getNonceKey(walletId, context).first,
+            MuSig.aggregate_schnorr_nonces(
                 nonces
-            ).first, aggPubKey, sighashMuSig
+            ).first,
+            aggPubKey,
+            sighashMuSig
         )
 
         return signature
@@ -459,9 +507,15 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(publicKeys)
         val pubKeyDataMuSig = aggPubKey.getEncoded(true)
 
-        val (_, newTransaction) = constructNewTransaction(oldTransactionSerialized, pubKeyDataMuSig, paymentAmount, receiverAddress)
+        val (_, newTransaction) = constructNewTransaction(
+            oldTransactionSerialized,
+            pubKeyDataMuSig,
+            paymentAmount,
+            receiverAddress
+        )
 
-        val aggregateSignature = MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
+        val aggregateSignature =
+            MuSig.aggregate_musig_signatures(signaturesOfOldOwners, aggregateNonce)
 
         val cTxInWitness = CTxInWitness(arrayOf(aggregateSignature))
         val cTxWitness = CTxWitness(arrayOf(cTxInWitness))
@@ -471,23 +525,38 @@ class WalletManager(
         return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
-    private fun constructNewTransaction(oldTransactionSerialized: String, pubKeyDataMuSig: ByteArray, paymentAmount: Long, receiverAddress: org.bitcoinj.core.Address): Pair<CTransaction, CTransaction> {
+    private fun constructNewTransaction(
+        oldTransactionSerialized: String,
+        pubKeyDataMuSig: ByteArray,
+        paymentAmount: Long,
+        receiverAddress: org.bitcoinj.core.Address
+    ): Pair<CTransaction, CTransaction> {
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
 
-        val programMusig = byteArrayOf(pubKeyDataMuSig[0] and 1.toByte()).plus(pubKeyDataMuSig.drop(1)).toHex()
+        val programMusig =
+            byteArrayOf(pubKeyDataMuSig[0] and 1.toByte()).plus(pubKeyDataMuSig.drop(1)).toHex()
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
         val newMultiSignatureOutputMoney = Coin.valueOf(paymentAmount)
         newTransaction.addOutput(newMultiSignatureOutputMoney, receiverAddress)
 
-        val multisigInput = newTransaction.addInput(Transaction(params, oldTransactionSerialized.hexToBytes()).outputs.filter { it.scriptBytes.size == 35 }[0])
+        val multisigInput = newTransaction.addInput(
+            Transaction(
+                params,
+                oldTransactionSerialized.hexToBytes()
+            ).outputs.filter { it.scriptBytes.size == 35 }[0]
+        )
         multisigInput.disconnect()
 
-        val oldMultiSignatureOutput = oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
+        val oldMultiSignatureOutput =
+            oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
 
-        newTransaction.addOutput(Coin.valueOf(oldMultiSignatureOutput - paymentAmount), org.bitcoinj.core.Address.fromString(params, addressMuSig))
+        newTransaction.addOutput(
+            Coin.valueOf(oldMultiSignatureOutput - paymentAmount),
+            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+        )
 
         val newCTx = CTransaction().deserialize(newTransaction.bitcoinSerialize())
         return Pair(oldTransaction, newCTx)
@@ -495,9 +564,14 @@ class WalletManager(
 
     private fun sendTaprootTransaction(transaction: CTransaction): Boolean {
         Log.i("YEET", "transaction serialized: ${transaction.serialize().toHex()}")
-        val url = URL("https://$REG_TEST_FAUCET_DOMAIN/generateBlock?tx_id=${transaction.serialize().toHex()}")
+        val url = URL(
+            "https://$REG_TEST_FAUCET_DOMAIN/generateBlock?tx_id=${
+                transaction.serialize().toHex()
+            }"
+        )
 
-        val executor: ExecutorService = Executors.newCachedThreadPool(Executors.defaultThreadFactory())
+        val executor: ExecutorService =
+            Executors.newCachedThreadPool(Executors.defaultThreadFactory())
 
         val future: Future<Boolean> = executor.submit(object : Callable<Boolean> {
             override fun call(): Boolean {
@@ -516,6 +590,47 @@ class WalletManager(
         } catch (e: Exception) {
             false
         }
+    }
+
+    /**
+     * Store a private key that has already been calculated before
+     * @param swUniqueId - String, the unique id of the DAO you want to create a nonce for
+     * @param privateKey - String, the private key that needs to be stored
+     */
+    fun storeNonceKey(swUniqueId: String, context: Context, privateKey: String) {
+        val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
+        val editor = nonceKeyData.edit()
+        Log.i("NONCE_KEY", "Stored key for DAO: $swUniqueId")
+        Log.i("NONCE_KEY", privateKey)
+        editor.putString(swUniqueId, privateKey)
+        editor.apply()
+    }
+
+    /**
+     * Create a new nonce per DAO and store them in a file in the shared preference folder
+     * @param swUniqueId - String, the unique id of the DAO you want to create a nonce for
+     * @return nonce key pair
+     */
+    fun addNewNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
+        val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
+        val nonce = Key.generate_schnorr_nonce(ECKey().privKeyBytes)
+        val privateKey = nonce.first.privKey.toByteArray().toHex()
+        val editor = nonceKeyData.edit()
+        Log.i("NONCE_KEY", "New key created for DAO: $swUniqueId")
+        Log.i("NONCE_KEY", privateKey)
+        editor.putString(swUniqueId, privateKey)
+        editor.apply()
+        return nonce
+    }
+
+    /**
+     * Get the nonce key that is stored for that specific DAO
+     * @param swUniqueId - String, the unique id of the DAO you want to get a nonce for
+     * @return nonce key pair
+     */
+    fun getNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
+        val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
+        return Key.generate_schnorr_nonce(nonceKeyData.getString(swUniqueId, "")!!.hexToBytes())
     }
 
     companion object {

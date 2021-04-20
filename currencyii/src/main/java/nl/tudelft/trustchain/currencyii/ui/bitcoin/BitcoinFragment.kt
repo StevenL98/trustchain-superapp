@@ -20,7 +20,6 @@ import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.NetworkParameters
 import org.bitcoinj.wallet.Wallet
-import java.io.IOException
 import java.lang.Exception
 import java.net.HttpURLConnection
 import java.net.URL
@@ -35,7 +34,7 @@ const val BALANCE_THRESHOLD = "5"
 class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     ImportKeyDialog.ImportKeyDialogListener {
 
-    private var getBitcoinPressed = false
+        private var getBitcoinPressed = false
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
@@ -213,13 +212,15 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
         val executor: ExecutorService = Executors.newCachedThreadPool(Executors.defaultThreadFactory())
         val future: Future<Boolean>
 
-        val url = URL("https://$REG_TEST_FAUCET_DOMAIN/addBTC?address=$address")
+        val url = "https://$REG_TEST_FAUCET_DOMAIN/addBTC?address=$address"
 
         future = executor.submit(object : Callable<Boolean> {
             override fun call(): Boolean {
-                val connection = url.openConnection() as HttpURLConnection
+                val connection = URL(url).openConnection() as HttpURLConnection
 
                 try {
+                    Log.i("Coin", url)
+                    Log.i("Coin", connection.responseMessage)
                     return connection.responseCode == 200
                 } finally {
                     connection.disconnect()

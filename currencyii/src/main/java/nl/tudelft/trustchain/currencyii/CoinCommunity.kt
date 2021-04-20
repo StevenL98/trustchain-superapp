@@ -39,12 +39,14 @@ class CoinCommunity : Community() {
      */
     fun createBitcoinGenesisWallet(
         entranceFee: Long,
-        threshold: Int
-    ) {
-        daoCreateHelper.createBitcoinGenesisWallet(
+        threshold: Int,
+        context: Context
+    ): SWJoinBlockTransactionData {
+        return daoCreateHelper.createBitcoinGenesisWallet(
             myPeer,
             entranceFee,
-            threshold
+            threshold,
+            context
         )
     }
 
@@ -70,13 +72,15 @@ class CoinCommunity : Community() {
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<String>
+        signatures: List<SWResponseSignatureBlockTD>,
+        context: Context
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures
+            signatures,
+            context
         )
     }
 
@@ -103,17 +107,19 @@ class CoinCommunity : Community() {
     fun transferFunds(
         walletBlockData: TrustChainTransaction,
         blockData: SWTransferFundsAskBlockTD,
-        signatures: List<String>,
+        responses: List<SWResponseSignatureBlockTD>,
         receiverAddress: String,
-        satoshiAmount: Long
+        satoshiAmount: Long,
+        context: Context
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
             walletBlockData,
             blockData,
-            signatures,
+            responses,
             receiverAddress,
-            satoshiAmount
+            satoshiAmount,
+            context
         )
     }
 
@@ -218,7 +224,7 @@ class CoinCommunity : Community() {
      * Fetch all DAO blocks that contain a signature. These blocks are the response of a signature request.
      * Signatures are fetched from [SIGNATURE_AGREEMENT_BLOCK] type blocks.
      */
-    fun fetchProposalSignatures(walletId: String, proposalId: String): List<SWResponseSignatureBlockTD> {
+    fun fetchProposalResponses(walletId: String, proposalId: String): List<SWResponseSignatureBlockTD> {
         return getTrustChainCommunity().database.getBlocksWithType(SIGNATURE_AGREEMENT_BLOCK)
             .filter {
                 val blockData = SWResponseSignatureTransactionData(it.transaction)
@@ -232,7 +238,7 @@ class CoinCommunity : Community() {
      * Fetch all DAO blocks that contain a negative signature. These blocks are the response of a negative signature request.
      * Signatures are fetched from [SIGNATURE_AGREEMENT_NEGATIVE_BLOCK] type blocks.
      */
-    fun fetchNegativeProposalSignatures(walletId: String, proposalId: String): List<SWResponseNegativeSignatureBlockTD> {
+    fun fetchNegativeProposalResponses(walletId: String, proposalId: String): List<SWResponseNegativeSignatureBlockTD> {
         return getTrustChainCommunity().database.getBlocksWithType(
             SIGNATURE_AGREEMENT_NEGATIVE_BLOCK
         )
@@ -250,7 +256,8 @@ class CoinCommunity : Community() {
     fun joinAskBlockReceived(
         block: TrustChainBlock,
         myPublicKey: ByteArray,
-        votedInFavor: Boolean
+        votedInFavor: Boolean,
+        context: Context
     ) {
         val latestHash = SWSignatureAskTransactionData(block.transaction).getData()
             .SW_PREVIOUS_BLOCK_HASH
@@ -259,7 +266,7 @@ class CoinCommunity : Community() {
         val joinBlock = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
         val oldTransaction = joinBlock.SW_TRANSACTION_SERIALIZED
 
-        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, joinBlock, myPublicKey, votedInFavor)
+        DAOJoinHelper.joinAskBlockReceived(oldTransaction, block, joinBlock, myPublicKey, votedInFavor, context)
     }
 
     /**
@@ -268,7 +275,8 @@ class CoinCommunity : Community() {
     fun transferFundsBlockReceived(
         block: TrustChainBlock,
         myPublicKey: ByteArray,
-        votedInFavor: Boolean
+        votedInFavor: Boolean,
+        context: Context
     ) {
         val latestHash = SWTransferFundsAskTransactionData(block.transaction).getData()
             .SW_PREVIOUS_BLOCK_HASH
@@ -282,7 +290,8 @@ class CoinCommunity : Community() {
             block,
             transferBlock,
             myPublicKey,
-            votedInFavor
+            votedInFavor,
+            context
         )
     }
 
@@ -294,7 +303,7 @@ class CoinCommunity : Community() {
             val data = SWSignatureAskTransactionData(block.transaction).getData()
             val signatures =
                 ArrayList(
-                    fetchProposalSignatures(
+                    fetchProposalResponses(
                         data.SW_UNIQUE_ID,
                         data.SW_UNIQUE_PROPOSAL_ID
                     )
@@ -305,7 +314,7 @@ class CoinCommunity : Community() {
             val data = SWTransferFundsAskTransactionData(block.transaction).getData()
             val signatures =
                 ArrayList(
-                    fetchProposalSignatures(
+                    fetchProposalResponses(
                         data.SW_UNIQUE_ID,
                         data.SW_UNIQUE_PROPOSAL_ID
                     )
@@ -324,7 +333,7 @@ class CoinCommunity : Community() {
             discoverSharedWallets().filter { b -> SWJoinBlockTransactionData(b.transaction).getData().SW_UNIQUE_ID == data.SW_UNIQUE_ID }[0]
         val swData = SWJoinBlockTransactionData(sw.transaction).getData()
         val againstSignatures = ArrayList(
-            fetchNegativeProposalSignatures(
+            fetchNegativeProposalResponses(
                 data.SW_UNIQUE_ID,
                 data.SW_UNIQUE_PROPOSAL_ID
             )
@@ -338,7 +347,7 @@ class CoinCommunity : Community() {
     /**
      * Get my signature to check if I already voted
      */
-    fun getMySignatureJoinRequest(data: SWSignatureAskBlockTD): BigInteger {
+    fun getMySignatureJoinRequest(data: SWSignatureAskBlockTD, context: Context): BigInteger {
         val walletManager = WalletManagerAndroid.getInstance()
 
         val latestHash = data.SW_PREVIOUS_BLOCK_HASH
@@ -354,14 +363,16 @@ class CoinCommunity : Community() {
             CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
             joinBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             joinBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
-            walletManager.protocolECKey()
+            walletManager.protocolECKey(),
+            joinBlock.SW_UNIQUE_ID,
+            context
         )
     }
 
     /**
      * Get my signature to check if I already voted
      */
-    fun getMySignatureTransaction(data: SWTransferFundsAskBlockTD): BigInteger {
+    fun getMySignatureTransaction(data: SWTransferFundsAskBlockTD, context: Context): BigInteger {
         val walletManager = WalletManagerAndroid.getInstance()
 
         val latestHash = data.SW_PREVIOUS_BLOCK_HASH
@@ -382,7 +393,9 @@ class CoinCommunity : Community() {
             transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
             walletManager.protocolECKey(),
             receiverAddress,
-            data.SW_TRANSFER_FUNDS_AMOUNT
+            data.SW_TRANSFER_FUNDS_AMOUNT,
+            transferBlock.SW_UNIQUE_ID,
+            context
         )
     }
 
@@ -391,7 +404,7 @@ class CoinCommunity : Community() {
      */
     fun canWinTransferRequest(data: SWTransferFundsAskBlockTD): Boolean {
         val againstSignatures = ArrayList(
-            fetchNegativeProposalSignatures(
+            fetchNegativeProposalResponses(
                 data.SW_UNIQUE_ID,
                 data.SW_UNIQUE_PROPOSAL_ID
             )
