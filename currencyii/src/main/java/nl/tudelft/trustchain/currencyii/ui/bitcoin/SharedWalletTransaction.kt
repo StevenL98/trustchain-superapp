@@ -97,7 +97,7 @@ class SharedWalletTransaction : BaseFragment(R.layout.fragment_shared_wallet_tra
         val swJoinBlock: TrustChainBlock =
             getCoinCommunity().fetchLatestSharedWalletBlock(blockHash!!)
                 ?: throw IllegalStateException("Shared Wallet not found given the hash: ${blockHash!!}")
-//        val walletData = SWJoinBlockTransactionData(swJoinBlock.transaction).getData()
+        val walletData = SWJoinBlockTransactionData(swJoinBlock.transaction).getData()
 
         if (getBalance().minus(Coin.valueOf(satoshiTransferAmount)).isNegative) {
             activity?.runOnUiThread {
@@ -127,6 +127,7 @@ class SharedWalletTransaction : BaseFragment(R.layout.fragment_shared_wallet_tra
         val signatures = collectSignatures(transferFundsData)
         try {
             getCoinCommunity().transferFunds(
+                walletData,
                 swJoinBlock.transaction,
                 transferFundsData.getData(),
                 signatures,

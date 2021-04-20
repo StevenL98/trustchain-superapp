@@ -88,6 +88,7 @@ class DAOTransferFundsHelper {
      */
     fun transferFunds(
         myPeer: Peer,
+        walletData: SWJoinBlockTD,
         walletBlockData: TrustChainTransaction,
         blockData: SWTransferFundsAskBlockTD,
         signatures: List<String>,
@@ -125,7 +126,7 @@ class DAOTransferFundsHelper {
             Log.e("Coin", "taproot transaction submission to server failed")
         }
 
-        broadcastTransferFundSuccessful(myPeer, oldWalletBlockData, serializedTransaction)
+        broadcastTransferFundSuccessful(myPeer, walletData, oldWalletBlockData, serializedTransaction)
     }
 
     /**
@@ -133,21 +134,33 @@ class DAOTransferFundsHelper {
      */
     private fun broadcastTransferFundSuccessful(
         myPeer: Peer,
+        walletData: SWJoinBlockTD,
         oldBlockData: SWTransferDoneTransactionData,
         serializedTransaction: String
     ) {
         val newData = SWTransferDoneTransactionData(oldBlockData.jsonData)
-        val walletManager = WalletManagerAndroid.getInstance()
-
-        newData.addBitcoinPk(walletManager.networkPublicECKeyHex())
-        newData.addTrustChainPk(myPeer.publicKey.keyToBin().toHex())
         newData.setTransactionSerialized(serializedTransaction)
-        newData.addNoncePk(walletManager.nonceECPointHex())
+
+        val refreshDaoBlock = SWJoinBlockTransactionData(
+            walletData.SW_ENTRANCE_FEE,
+            serializedTransaction,
+            walletData.SW_VOTING_THRESHOLD,
+            walletData.SW_TRUSTCHAIN_PKS,
+            walletData.SW_BITCOIN_PKS,
+            walletData.SW_NONCE_PKS,
+            walletData.SW_UNIQUE_ID
+        )
 
         trustchain.createProposalBlock(
             newData.getJsonString(),
             myPeer.publicKey.keyToBin(),
             newData.blockType
+        )
+
+        trustchain.createProposalBlock(
+            refreshDaoBlock.getJsonString(),
+            myPeer.publicKey.keyToBin(),
+            refreshDaoBlock.blockType
         )
     }
 
@@ -175,7 +188,6 @@ class DAOTransferFundsHelper {
 
             val walletManager = WalletManagerAndroid.getInstance()
 
-//            val newTransactionSerialized = blockData.SW_TRANSACTION_SERIALIZED
             val signature = walletManager.safeSigningTransactionFromMultiSig(
                 oldTransactionSerialized,
                 transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },

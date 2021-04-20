@@ -101,6 +101,7 @@ class CoinCommunity : Community() {
      * 3.2 Transfer funds from an existing shared wallet to a third-party. Broadcast bitcoin transaction.
      */
     fun transferFunds(
+        walletData: SWJoinBlockTD,
         walletBlockData: TrustChainTransaction,
         blockData: SWTransferFundsAskBlockTD,
         signatures: List<String>,
@@ -109,6 +110,7 @@ class CoinCommunity : Community() {
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
+            walletData,
             walletBlockData,
             blockData,
             signatures,
