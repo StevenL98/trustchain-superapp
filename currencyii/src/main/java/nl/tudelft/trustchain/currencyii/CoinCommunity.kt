@@ -8,16 +8,10 @@ import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
-import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
 import nl.tudelft.trustchain.currencyii.util.DAOJoinHelper
 import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
-import nl.tudelft.trustchain.currencyii.util.taproot.CTransaction
-import org.bitcoinj.core.Address
-import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.Transaction
-import java.math.BigInteger
 
 @Suppress("UNCHECKED_CAST")
 class CoinCommunity : Community() {
@@ -35,7 +29,9 @@ class CoinCommunity : Community() {
     /**
      * Create a bitcoin genesis wallet and broadcast the result on trust chain.
      * The bitcoin transaction may take some time to finish.
-     * **Throws** exceptions if something goes wrong with creating or broadcasting bitcoin transaction.
+     * @throws - exception if something goes wrong with creating or broadcasting bitcoin transaction.
+     * @param entranceFee - Long, the entrance fee for joining the DAO.
+     * @param threshold - Int, the percentage of members that need to vote before allowing someone in the DAO.
      */
     fun createBitcoinGenesisWallet(
         entranceFee: Long,
@@ -67,19 +63,22 @@ class CoinCommunity : Community() {
      *
      * Note:
      * There should be enough sufficient signatures, based on the multisig wallet data.
-     * **Throws** exceptions if something goes wrong with creating or broadcasting bitcoin transaction.
+     * @throws - exceptions if something goes wrong with creating or broadcasting bitcoin transaction.
+     * @param walletBlockData - TrustChainTransaction, describes the wallet that is joined
+     * @param blockData - SWSignatureAskBlockTD, the block where the other users are voting on
+     * @param responses - the positive responses for your request to join the wallet
      */
     fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
-        signatures: List<SWResponseSignatureBlockTD>,
+        responses: List<SWResponseSignatureBlockTD>,
         context: Context
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
-            signatures,
+            responses,
             context
         )
     }
@@ -87,6 +86,10 @@ class CoinCommunity : Community() {
     /**
      * 3.1 Send a proposal block on trustchain to ask for the signatures.
      * Assumed that people agreed to the transfer.
+     * @param walletBlock - TrustChainBlock, describes the wallet where the transfer is from
+     * @param receiverAddressSerialized - String, the address where the transaction needs to go
+     * @param satoshiAmount - Long, the amount that needs to be transferred
+     * @return the proposal block
      */
     fun proposeTransferFunds(
         walletBlock: TrustChainBlock,
@@ -103,6 +106,12 @@ class CoinCommunity : Community() {
 
     /**
      * 3.2 Transfer funds from an existing shared wallet to a third-party. Broadcast bitcoin transaction.
+     * @param walletData - SWJoinBlockTD, the data about the wallet when joining the wallet
+     * @param walletBlockData - TrustChainTransaction, describes the wallet where the transfer is from
+     * @param blockData - SWTransferFundsAskBlockTD, the block where the other users are voting on
+     * @param responses - List<SWResponseSignatureBlockTD>, the list with positive responses on the voting
+     * @param receiverAddress - String, the address where the transfer needs to go
+     * @param satoshiAmount - Long, the amount that needs to be transferred
      */
     fun transferFunds(
         walletData: SWJoinBlockTD,
@@ -178,6 +187,10 @@ class CoinCommunity : Community() {
         }
     }
 
+    /**
+     * Get the public key of the one that is receiving the request
+     * @return string
+     */
     private fun fetchSignatureRequestReceiver(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
             return SWSignatureAskTransactionData(block.transaction).getData().SW_RECEIVER_PK
@@ -347,61 +360,6 @@ class CoinCommunity : Community() {
     }
 
     /**
-     * Get my signature to check if I already voted
-     */
-    fun getMySignatureJoinRequest(data: SWSignatureAskBlockTD, context: Context): BigInteger {
-        val walletManager = WalletManagerAndroid.getInstance()
-
-        val latestHash = data.SW_PREVIOUS_BLOCK_HASH
-        val mostRecentSWBlock =
-            fetchLatestSharedWalletBlock(latestHash.hexToBytes())
-                ?: throw IllegalStateException("Most recent DAO block not found")
-        val joinBlock = SWJoinBlockTransactionData(mostRecentSWBlock.transaction).getData()
-        val oldTransaction = joinBlock.SW_TRANSACTION_SERIALIZED
-
-        val newTransactionSerialized = data.SW_TRANSACTION_SERIALIZED
-        return walletManager.safeSigningJoinWalletTransaction(
-            CTransaction().deserialize(oldTransaction.hexToBytes()),
-            CTransaction().deserialize(newTransactionSerialized.hexToBytes()),
-            joinBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
-            joinBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
-            walletManager.protocolECKey(),
-            joinBlock.SW_UNIQUE_ID,
-            context
-        )
-    }
-
-    /**
-     * Get my signature to check if I already voted
-     */
-    fun getMySignatureTransaction(data: SWTransferFundsAskBlockTD, context: Context): BigInteger {
-        val walletManager = WalletManagerAndroid.getInstance()
-
-        val latestHash = data.SW_PREVIOUS_BLOCK_HASH
-        val mostRecentSWBlock =
-            fetchLatestSharedWalletBlock(latestHash.hexToBytes())
-                ?: throw IllegalStateException("Most recent DAO block not found")
-        val transferBlock = SWTransferDoneTransactionData(mostRecentSWBlock.transaction).getData()
-        val oldTransaction = transferBlock.SW_TRANSACTION_SERIALIZED
-
-        val receiverAddress = Address.fromString(
-            walletManager.params,
-            data.SW_TRANSFER_FUNDS_TARGET_SERIALIZED
-        )
-
-        return walletManager.safeSigningTransactionFromMultiSig(
-            oldTransaction,
-            transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
-            transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
-            walletManager.protocolECKey(),
-            receiverAddress,
-            data.SW_TRANSFER_FUNDS_AMOUNT,
-            transferBlock.SW_UNIQUE_ID,
-            context
-        )
-    }
-
-    /**
      * Check if the number of required votes are more than the number of possible votes minus the negative votes.
      */
     fun canWinTransferRequest(data: SWTransferFundsAskBlockTD): Boolean {
@@ -418,15 +376,8 @@ class CoinCommunity : Community() {
     }
 
     companion object {
-        /**
-         * Helper method that serializes a bitcoin transaction to a string.
-         */
-        fun getSerializedTransaction(transaction: Transaction): String {
-            return transaction.bitcoinSerialize().toHex()
-        }
-
         // Default maximum wait timeout for bitcoin transaction broadcasts in seconds
-        const val DEFAULT_BITCOIN_MAX_TIMEOUT: Long = 60 * 5
+        const val DEFAULT_BITCOIN_MAX_TIMEOUT: Long = 10
 
         // Block type for join DAO blocks
         const val JOIN_BLOCK = "v1DAO_JOIN"
@@ -437,15 +388,11 @@ class CoinCommunity : Community() {
         // Block type for basic signature requests
         const val SIGNATURE_ASK_BLOCK = "v1DAO_ASK_SIGNATURE"
 
-        const val NONCE_ASK_BLOCK = "v1DAO_ASK_NONCE"
-
         // Block type for transfer funds signature requests
         const val TRANSFER_FUNDS_ASK_BLOCK = "v1DAO_TRANSFER_ASK_SIGNATURE"
 
         // Block type for responding to a signature request with a (should be valid) signature
         const val SIGNATURE_AGREEMENT_BLOCK = "v1DAO_SIGNATURE_AGREEMENT"
-
-        const val NONCE_AGREEMENT_BLOCK = "v1DAO_NONCE_AGREEMENT"
 
         // Block type for responding with a negative vote to a signature request with a signature
         const val SIGNATURE_AGREEMENT_NEGATIVE_BLOCK = "v1DAO_SIGNATURE_AGREEMENT_NEGATIVE"

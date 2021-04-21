@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.common.base.Joiner
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.CoinCommunity.Companion.DEFAULT_BITCOIN_MAX_TIMEOUT
 import nl.tudelft.trustchain.currencyii.util.taproot.*
 import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
@@ -438,10 +439,14 @@ class WalletManager(
      * (3.1) There is a set-up multi-sig wallet and a proposal, create a signature
      * for the proposal.
      * The transaction includes an output for residual funds using calculated fee estimates.
-     * @param transaction PREVIOUS transaction with the multi-sig output
-     * @param myPrivateKey key to sign with (yourself most likely)
+     * @param oldTransactionSerialized PREVIOUS transaction with the multi-sig output
+     * @param publicKeys the public keys of the users that signed
+     * @param nonces the nonce public keys of the users that signed
+     * @param key key to sign with (yourself most likely)
      * @param receiverAddress receiver address
      * @param paymentAmount amount for receiver address
+     * @param walletId the wallet id where the transaction is being signed from
+     * @param context used to retrieve the nonce key of the user to sign
      * @return ECDSASignature
      */
     fun safeSigningTransactionFromMultiSig(
@@ -475,7 +480,8 @@ class WalletManager(
             SIGHASH_ALL_TAPROOT,
             input_index = 0
         )
-        val signature = MuSig.sign_musig(
+
+        return MuSig.sign_musig(
             ECKey.fromPrivate(privChallenge),
             getNonceKey(walletId, context).first,
             MuSig.aggregate_schnorr_nonces(
@@ -484,16 +490,16 @@ class WalletManager(
             aggPubKey,
             sighashMuSig
         )
-
-        return signature
     }
 
     /**
      * (3.2) There is a set-up multi-sig wallet and there are enough signatures
      * to broadcast a transaction with.
      * The transaction includes an output for residual funds using calculated fee estimates.
-     * @param transaction transaction with multi-sig output.
-     * @param signatures signatures of owners (yourself included)
+     * @param publicKeys the public keys of the users that signed
+     * @param signaturesOfOldOwners signatures of owners (yourself included)
+     * @param aggregateNonce aggregated nonces
+     * @param oldTransactionSerialized PREVIOUS transaction with the multi-sig output
      * @param receiverAddress receiver address
      * @param paymentAmount amount for receiver address
      * @return transaction
@@ -527,6 +533,13 @@ class WalletManager(
         return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
+    /**
+     * Construct a new transaction from the old transaction that is serialized
+     * @param oldTransactionSerialized PREVIOUS transaction with the multi-sig output
+     * @param pubKeyDataMuSig MuSig public key as defined in the MuSig paper
+     * @param paymentAmount the amount that needs to be transferred
+     * @param receiverAddress the address where the payment needs to go
+     */
     private fun constructNewTransaction(
         oldTransactionSerialized: String,
         pubKeyDataMuSig: ByteArray,
@@ -564,8 +577,13 @@ class WalletManager(
         return Pair(oldTransaction, newCTx)
     }
 
+    /**
+     * Send the taproot transaction to the bitcoin server
+     * @param transaction the CTransaction that needs to be send to the server
+     * @return if the server handled the request successfully.
+     */
     private fun sendTaprootTransaction(transaction: CTransaction): Boolean {
-        Log.i("YEET", "transaction serialized: ${transaction.serialize().toHex()}")
+        Log.i("Coin", "Sending serialized transaction to the server: ${transaction.serialize().toHex()}")
         val url = URL(
             "https://$REG_TEST_FAUCET_DOMAIN/generateBlock?tx_id=${
                 transaction.serialize().toHex()
@@ -588,7 +606,7 @@ class WalletManager(
         })
 
         return try {
-            future.get(10, TimeUnit.SECONDS)
+            future.get(DEFAULT_BITCOIN_MAX_TIMEOUT, TimeUnit.SECONDS)
         } catch (e: Exception) {
             false
         }
@@ -630,7 +648,7 @@ class WalletManager(
      * @param swUniqueId - String, the unique id of the DAO you want to get a nonce for
      * @return nonce key pair
      */
-    fun getNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
+    private fun getNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
         val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
         return Key.generate_schnorr_nonce(nonceKeyData.getString(swUniqueId, "")!!.hexToBytes())
     }
