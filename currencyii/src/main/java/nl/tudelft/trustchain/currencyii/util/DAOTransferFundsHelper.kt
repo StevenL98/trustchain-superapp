@@ -146,6 +146,7 @@ class DAOTransferFundsHelper {
     ) {
         val newData = SWTransferDoneTransactionData(oldBlockData.jsonData)
         newData.setTransactionSerialized(serializedTransaction)
+        newData.addNoncePk(WalletManagerAndroid.getInstance().nonceECPointHex(newData.getData().SW_UNIQUE_ID, context))
 
         val refreshDaoBlock = SWJoinBlockTransactionData(
             walletData.SW_ENTRANCE_FEE,
@@ -156,8 +157,6 @@ class DAOTransferFundsHelper {
             walletData.SW_NONCE_PKS,
             walletData.SW_UNIQUE_ID
         )
-        newData.addNoncePk(walletManager.nonceECPointHex(newData.getData().SW_UNIQUE_ID, context))
-
 
         trustchain.createProposalBlock(
             newData.getJsonString(),

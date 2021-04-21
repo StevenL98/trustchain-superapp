@@ -47,8 +47,6 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO disable MAINNET and TESTNET buttons and add disclaimer to not send or use real bitcoins
 
-// TODO Nonce per dao and refresh (this is fixed after steven merges his branch)
-
 // TODO after signing, go back to previous screen
 
 // TODO tests
@@ -56,6 +54,10 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 // TODO test different emulators joining mutual dao and sending funds
 
 // TODO either remove or keep fees
+
+// TODO Check the double subtraction of the entrance fee when you join a wallet for the second time
+
+// TODO Sending taproot transaction to the server fails, when voting from multiple devices
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
@@ -317,6 +319,8 @@ class WalletManager(
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
+        //TODO: This subtracts the current balance + the entrance fee of the DAO from the user balance, which is not correct as the entrance fee should only be subtracted.
+        //TODO: But when I remove this line, it will not add the value anymore to the DAO, so we have to take a look at it.
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
             newMultiSignatureOutputMoney,
