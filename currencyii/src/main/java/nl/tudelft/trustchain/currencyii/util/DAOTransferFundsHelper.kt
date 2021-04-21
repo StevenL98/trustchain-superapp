@@ -88,6 +88,7 @@ class DAOTransferFundsHelper {
      */
     fun transferFunds(
         myPeer: Peer,
+        walletData: SWJoinBlockTD,
         walletBlockData: TrustChainTransaction,
         blockData: SWTransferFundsAskBlockTD,
         responses: List<SWResponseSignatureBlockTD>,
@@ -130,7 +131,7 @@ class DAOTransferFundsHelper {
 
         oldWalletBlockData.getData().SW_NONCE_PKS = newNonces
 
-        broadcastTransferFundSuccessful(myPeer, oldWalletBlockData, serializedTransaction, context)
+        broadcastTransferFundSuccessful(myPeer, walletData, oldWalletBlockData, serializedTransaction, context)
     }
 
     /**
@@ -138,22 +139,36 @@ class DAOTransferFundsHelper {
      */
     private fun broadcastTransferFundSuccessful(
         myPeer: Peer,
+        walletData: SWJoinBlockTD,
         oldBlockData: SWTransferDoneTransactionData,
         serializedTransaction: String,
         context: Context
     ) {
         val newData = SWTransferDoneTransactionData(oldBlockData.jsonData)
-        val walletManager = WalletManagerAndroid.getInstance()
-
-        newData.addBitcoinPk(walletManager.networkPublicECKeyHex())
-        newData.addTrustChainPk(myPeer.publicKey.keyToBin().toHex())
         newData.setTransactionSerialized(serializedTransaction)
+
+        val refreshDaoBlock = SWJoinBlockTransactionData(
+            walletData.SW_ENTRANCE_FEE,
+            serializedTransaction,
+            walletData.SW_VOTING_THRESHOLD,
+            walletData.SW_TRUSTCHAIN_PKS,
+            walletData.SW_BITCOIN_PKS,
+            walletData.SW_NONCE_PKS,
+            walletData.SW_UNIQUE_ID
+        )
         newData.addNoncePk(walletManager.nonceECPointHex(newData.getData().SW_UNIQUE_ID, context))
+
 
         trustchain.createProposalBlock(
             newData.getJsonString(),
             myPeer.publicKey.keyToBin(),
             newData.blockType
+        )
+
+        trustchain.createProposalBlock(
+            refreshDaoBlock.getJsonString(),
+            myPeer.publicKey.keyToBin(),
+            refreshDaoBlock.blockType
         )
     }
 

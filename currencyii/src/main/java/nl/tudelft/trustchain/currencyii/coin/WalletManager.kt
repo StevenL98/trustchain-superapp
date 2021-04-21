@@ -51,13 +51,11 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO after signing, go back to previous screen
 
-// TODO use both transfer fund and join block to determine DAO balance (currently only join block)
-
-// TODO bug: after transfer fund, join doesnt work
-
 // TODO tests
 
 // TODO test different emulators joining mutual dao and sending funds
+
+// TODO either remove or keep fees
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
