@@ -319,8 +319,8 @@ class WalletManager(
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
-        //TODO: This subtracts the current balance + the entrance fee of the DAO from the user balance, which is not correct as the entrance fee should only be subtracted.
-        //TODO: But when I remove this line, it will not add the value anymore to the DAO, so we have to take a look at it.
+        // TODO: This subtracts the current balance + the entrance fee of the DAO from the user balance, which is not correct as the entrance fee should only be subtracted.
+        // TODO: But when I remove this line, it will not add the value anymore to the DAO, so we have to take a look at it.
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
             newMultiSignatureOutputMoney,
