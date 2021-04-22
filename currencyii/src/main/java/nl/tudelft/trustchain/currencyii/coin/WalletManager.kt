@@ -7,7 +7,7 @@ import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity.Companion.DEFAULT_BITCOIN_MAX_TIMEOUT
 import nl.tudelft.trustchain.currencyii.util.taproot.*
-import nl.tudelft.trustchain.currencyii.util.taproot.Address
+import nl.tudelft.trustchain.currencyii.util.taproot.SegwitAddress
 import org.bitcoinj.core.*
 import org.bitcoinj.core.DumpedPrivateKey
 import org.bitcoinj.core.LegacyAddress
@@ -257,13 +257,7 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(listOf(protocolECKey()))
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
-        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(
-            pubKeyDataMusig.drop(
-                1
-            )
-        ).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = SegwitAddressUtil.key_to_witness(pubKeyDataMusig)
 
         val transaction = Transaction(params)
 
@@ -316,10 +310,7 @@ class WalletManager(
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
 
-        val programMusig =
-            byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = SegwitAddressUtil.key_to_witness(pubKeyDataMusig)
 
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
@@ -557,10 +548,7 @@ class WalletManager(
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
 
-        val programMusig =
-            byteArrayOf(pubKeyDataMuSig[0] and 1.toByte()).plus(pubKeyDataMuSig.drop(1)).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = SegwitAddressUtil.key_to_witness(pubKeyDataMuSig)
 
         val newMultiSignatureOutputMoney = Coin.valueOf(paymentAmount)
         newTransaction.addOutput(newMultiSignatureOutputMoney, receiverAddress)
