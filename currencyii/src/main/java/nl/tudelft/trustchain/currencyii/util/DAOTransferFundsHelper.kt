@@ -138,7 +138,7 @@ class DAOTransferFundsHelper {
 
         oldWalletBlockData.getData().SW_NONCE_PKS = newNonces
 
-        broadcastTransferFundSuccessful(myPeer, walletData, oldWalletBlockData, serializedTransaction, context)
+        broadcastTransferFundSuccessful(myPeer, walletData, oldWalletBlockData, serializedTransaction)
     }
 
     /**
@@ -148,12 +148,10 @@ class DAOTransferFundsHelper {
         myPeer: Peer,
         walletData: SWJoinBlockTD,
         oldBlockData: SWTransferDoneTransactionData,
-        serializedTransaction: String,
-        context: Context
+        serializedTransaction: String
     ) {
         val newData = SWTransferDoneTransactionData(oldBlockData.jsonData)
         newData.setTransactionSerialized(serializedTransaction)
-        newData.addNoncePk(WalletManagerAndroid.getInstance().nonceECPointHex(newData.getData().SW_UNIQUE_ID, context))
 
         val refreshDaoBlock = SWJoinBlockTransactionData(
             walletData.SW_ENTRANCE_FEE,

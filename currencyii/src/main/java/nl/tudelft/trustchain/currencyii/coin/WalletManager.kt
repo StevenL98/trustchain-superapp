@@ -54,11 +54,9 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO test different emulators joining mutual dao and sending funds
 
-// TODO either remove or keep fees
-
-// TODO Check the double subtraction of the entrance fee when you join a wallet for the second time
-
 // TODO Sending taproot transaction to the server fails, when voting from multiple devices
+
+// TODO Transfer funds verneukt de dao balance
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
@@ -273,8 +271,11 @@ class WalletManager(
             entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig)
         )
 
+        // no fees since we are in a test network and this is a proof of concept still
         val req = SendRequest.forTx(transaction)
         req.changeAddress = protocolAddress()
+        req.feePerKb = Coin.valueOf(0)
+        req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
         Log.i("YEET", "txid: " + req.tx.txId.toString())
@@ -320,30 +321,37 @@ class WalletManager(
         val version = 1
         val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
 
-        // TODO: This subtracts the current balance + the entrance fee of the DAO from the user balance, which is not correct as the entrance fee should only be subtracted.
-        // TODO: But when I remove this line, it will not add the value anymore to the DAO, so we have to take a look at it.
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
             newMultiSignatureOutputMoney,
             org.bitcoinj.core.Address.fromString(params, addressMuSig)
         )
 
-        val multisigInput = newTransaction.addInput(
+        newTransaction.addInput(
             Transaction(
                 params,
                 oldTransactionSerialized.hexToBytes()
             ).outputs.filter { it.scriptBytes.size == 35 }[0]
-        )
-        multisigInput.disconnect()
+        ).disconnect()
 
+        // no fees since we are in a test network and this is a proof of concept still
         val req = SendRequest.forTx(newTransaction)
         req.changeAddress = protocolAddress()
+        req.feePerKb = Coin.valueOf(0)
+        req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
-        Log.i("YEET", "newtxid: " + req.tx.txId.toString())
-        Log.i("YEET", "serialized new tx: " + req.tx.bitcoinSerialize().toHex())
+        // BitcoinJ erroneously does not count the multisig input when determining how much to return to our own wallet.
+        // Therefore, we add the entranceFee to not lose any bitcoins
+        val changeOutput = req.tx.outputs.filter { it.scriptBytes.size != 35 }[0]
+        changeOutput.value = changeOutput.value.add(Coin.valueOf(oldMultiSignatureOutput))
 
-        return newTransaction.bitcoinSerialize().toHex()
+        kit.wallet().signTransaction(req)
+
+        Log.i("YEET", "newtxid: " + newTransaction.txId.toString())
+        Log.i("YEET", "serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
+
+        return req.tx.bitcoinSerialize().toHex()
     }
 
     /**
@@ -557,13 +565,12 @@ class WalletManager(
         val newMultiSignatureOutputMoney = Coin.valueOf(paymentAmount)
         newTransaction.addOutput(newMultiSignatureOutputMoney, receiverAddress)
 
-        val multisigInput = newTransaction.addInput(
+        newTransaction.addInput(
             Transaction(
                 params,
                 oldTransactionSerialized.hexToBytes()
             ).outputs.filter { it.scriptBytes.size == 35 }[0]
         )
-        multisigInput.disconnect()
 
         val oldMultiSignatureOutput =
             oldTransaction.vout.filter { it.scriptPubKey.size == 35 }[0].nValue
