@@ -353,7 +353,7 @@ class WalletManager(
         Log.i("YEET", "newtxid: " + newTransaction.txId.toString())
         Log.i("YEET", "serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
 
-        //TODO there is probably a bug if multiple vins are required by our own wallet (for example, multiple small txin's combined to 1 big vout)
+        // TODO there is probably a bug if multiple vins are required by our own wallet (for example, multiple small txin's combined to 1 big vout)
 
         return req.tx.bitcoinSerialize().toHex()
     }
