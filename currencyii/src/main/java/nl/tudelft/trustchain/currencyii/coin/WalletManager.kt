@@ -56,7 +56,7 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO Sending taproot transaction to the server fails, when voting from multiple devices
 
-// TODO Transfer funds verneukt de dao balance
+// TODO combinatie dao join transfer crasht nog
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
