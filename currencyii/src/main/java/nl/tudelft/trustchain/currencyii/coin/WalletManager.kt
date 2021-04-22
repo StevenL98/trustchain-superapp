@@ -52,11 +52,13 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO tests
 
-// TODO test different emulators joining mutual dao and sending funds
-
 // TODO Sending taproot transaction to the server fails, when voting from multiple devices
 
-// TODO combinatie dao join transfer crasht nog
+// TODO not automatically showing votes as they come in
+
+// TODO sloop fee eruit
+
+// TODO only allow one proposal at a time (not multiple transfers or multiple joins)
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
@@ -350,6 +352,8 @@ class WalletManager(
 
         Log.i("YEET", "newtxid: " + newTransaction.txId.toString())
         Log.i("YEET", "serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
+
+        //TODO there is probably a bug if multiple vins are required by our own wallet (for example, multiple small txin's combined to 1 big vout)
 
         return req.tx.bitcoinSerialize().toHex()
     }
