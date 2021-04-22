@@ -14,6 +14,7 @@ import nl.tudelft.trustchain.currencyii.TrustChainHelper
 import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.taproot.MuSig
+import org.bitcoinj.core.Address
 import org.bitcoinj.core.ECKey
 import java.math.BigInteger
 
@@ -124,7 +125,7 @@ class DAOTransferFundsHelper {
             signaturesOfOldOwners,
             aggregateNoncePoint,
             oldTransactionSerialized,
-            org.bitcoinj.core.Address.fromString(walletManager.params, receiverAddress),
+            Address.fromString(walletManager.params, receiverAddress),
             paymentAmount
         )
 
@@ -206,7 +207,7 @@ class DAOTransferFundsHelper {
                 transferBlock.SW_BITCOIN_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
                 transferBlock.SW_NONCE_PKS.map { ECKey.fromPublicOnly(it.hexToBytes()) },
                 walletManager.protocolECKey(),
-                org.bitcoinj.core.Address.fromString(walletManager.params, blockData.SW_TRANSFER_FUNDS_TARGET_SERIALIZED),
+                Address.fromString(walletManager.params, blockData.SW_TRANSFER_FUNDS_TARGET_SERIALIZED),
                 blockData.SW_TRANSFER_FUNDS_AMOUNT,
                 blockData.SW_UNIQUE_ID,
                 context

@@ -202,7 +202,7 @@ class WalletManager(
      * we are part of.
      * @return hex representation of our address
      */
-    fun protocolAddress(): org.bitcoinj.core.Address {
+    fun protocolAddress(): Address {
         return kit.wallet().issuedReceiveAddresses[0]
     }
 
@@ -260,7 +260,7 @@ class WalletManager(
         val transaction = Transaction(params)
 
         transaction.addOutput(
-            entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            entranceFee, Address.fromString(params, addressMuSig)
         )
 
         // no fees since we are in a test network and this is a proof of concept still
@@ -313,7 +313,7 @@ class WalletManager(
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
             newMultiSignatureOutputMoney,
-            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            Address.fromString(params, addressMuSig)
         )
 
         newTransaction.addInput(
@@ -451,7 +451,7 @@ class WalletManager(
         publicKeys: List<ECKey>,
         nonces: List<ECKey>,
         key: ECKey,
-        receiverAddress: org.bitcoinj.core.Address,
+        receiverAddress: Address,
         paymentAmount: Long,
         walletId: String,
         context: Context
@@ -506,7 +506,7 @@ class WalletManager(
         signaturesOfOldOwners: List<BigInteger>,
         aggregateNonce: ECPoint,
         oldTransactionSerialized: String,
-        receiverAddress: org.bitcoinj.core.Address,
+        receiverAddress: Address,
         paymentAmount: Long
     ): Pair<Boolean, String> {
         val (_, aggPubKey) = MuSig.generate_musig_key(publicKeys)
@@ -541,7 +541,7 @@ class WalletManager(
         oldTransactionSerialized: String,
         pubKeyDataMuSig: ByteArray,
         paymentAmount: Long,
-        receiverAddress: org.bitcoinj.core.Address
+        receiverAddress: Address
     ): Pair<CTransaction, CTransaction> {
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
@@ -563,7 +563,7 @@ class WalletManager(
 
         newTransaction.addOutput(
             Coin.valueOf(oldMultiSignatureOutput - paymentAmount),
-            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            Address.fromString(params, addressMuSig)
         )
 
         val newCTx = CTransaction().deserialize(newTransaction.bitcoinSerialize())
