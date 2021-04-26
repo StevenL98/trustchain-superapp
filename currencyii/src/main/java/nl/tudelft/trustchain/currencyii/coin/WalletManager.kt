@@ -46,6 +46,10 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO only allow one proposal at a time (not multiple transfers or multiple joins)
 
+// TODO crawl trustchain after successful transaction
+
+// TODO app crashes after the original DAO creator votes
+
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
  * with bitcoin wallets (including multi-signature wallets).
