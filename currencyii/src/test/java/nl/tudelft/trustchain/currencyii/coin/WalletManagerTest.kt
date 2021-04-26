@@ -1,35 +1,37 @@
-// package nl.tudelft.trustchain.currencyii.coin
-//
-// import nl.tudelft.ipv8.util.hexToBytes
-// import org.bitcoinj.core.Coin
-// import org.bitcoinj.core.ECKey
-// import org.bitcoinj.core.LegacyAddress
-// import org.bitcoinj.core.Sha256Hash
-// import org.bitcoinj.params.MainNetParams
-// import org.bitcoinj.script.ScriptPattern
-// import org.junit.Assert.assertFalse
-// import org.junit.Assert.assertTrue
-// import org.junit.BeforeClass
-// import org.junit.Test
-// import java.io.File
-//
-// class WalletManagerTest {
-//
-//    companion object {
-//        lateinit var walletManager: WalletManager
-//
-//        @BeforeClass
-//        @JvmStatic
-//        fun setup() {
-//            val config = WalletManagerConfiguration(BitcoinNetworkOptions.PRODUCTION)
-//            walletManager = WalletManager(
-//                config,
-//                File(".")
-//            )
-//        }
-//    }
-//
-// //    @Test
+package nl.tudelft.trustchain.currencyii.coin
+
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
+import java.io.File
+
+class WalletManagerTest {
+
+    companion object {
+        lateinit var walletManager: WalletManager
+
+        @BeforeAll
+        @JvmStatic
+        fun setup() {
+            val config = WalletManagerConfiguration(BitcoinNetworkOptions.REG_TEST)
+            walletManager = WalletManager(
+                config,
+                File(".")
+            )
+        }
+    }
+
+    /**
+     * Wallet address should be correct format (same regex as used on regtest server).
+     */
+    @Test
+    fun testProtocolAddress() {
+        val addressRegex = Regex("[a-km-zA-HJ-NP-Z1-9]{25,50}$")
+        val actual = walletManager.protocolAddress()
+        val matches: Boolean = actual.toString().matches(addressRegex)
+        assertTrue(matches)
+    }
+//    //    @Test
 //    fun testEntranceFeeTransactionWithWitnessTx() {
 //        val params = MainNetParams.get()
 //
@@ -42,7 +44,7 @@
 //            LegacyAddress.fromString(params, "1K6BWqtaXpDiZ4PEiPR3pNyXb4ZveKRWqm")
 //        val entranceFee = 0.01831933
 //
-//        val entranceFeePayed = WalletManager.checkEntranceFeeTransaction(
+//        val entranceFeePayed = WalletManagers.safeCreationJoinWalletTransaction(
 //            userBitcoinPk,
 //            transactionHash,
 //            sharedWalletBitcoinPk,
@@ -51,8 +53,8 @@
 //
 //        assertFalse("The entrance fee should be payed", entranceFeePayed)
 //    }
-//
-// //    @Test
+
+//    //    @Test
 //    fun testEntranceFeeTransactionWithInvalidTx() {
 //        val params = MainNetParams.get()
 //
@@ -75,7 +77,7 @@
 //        assertFalse("The entrance fee should be payed", entranceFeePayed)
 //    }
 //
-// //    @Test
+//    //    @Test
 //    fun testEntranceFeeTransactionValidUnconfirmedTx() {
 //        val params = MainNetParams.get()
 //
@@ -123,7 +125,7 @@
 //
 //        assertTrue("The entrance fee should be payed", entranceFeePayed)
 //    }
-//
+
 //    @Test
 //    fun testCreateMultiSignatureWallet2of3MultiSigCorrect() {
 //        val key1 = ECKey()
@@ -193,4 +195,4 @@
 //
 //        WalletManager.createMultiSignatureWallet(publicKeys, entranceFee, threshold)
 //    }
-// }
+}

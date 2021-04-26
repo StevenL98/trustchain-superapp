@@ -3,11 +3,10 @@ package nl.tudelft.trustchain.currencyii.util.taproot
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import org.bitcoinj.core.ECKey
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
-import org.junit.Assert.*
 import java.math.BigInteger
-import kotlin.experimental.and
 
 class MuSigTest {
 
@@ -71,11 +70,9 @@ class MuSigTest {
         assertEquals(expectedPubChallenge2, actualPubChallenge2)
 
         val pubkeyDataMuSig = actual.getEncoded(true)
-        val programMusig = byteArrayOf(pubkeyDataMuSig[0] and 1.toByte()).plus(pubkeyDataMuSig.drop(1))
-        val version = 1
 
         val expectedAddress = "bcrt1pqq7atlpuzandpfe5v6jejldg8m7v22gs0j0v6rzku23g2x0savcsgwp82mv"
-        val actualAddress = Address.program_to_witness(version, programMusig)
+        val actualAddress = TaprootUtil.key_to_witness(pubkeyDataMuSig)
 
         assertEquals(expectedAddress, actualAddress)
     }

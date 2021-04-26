@@ -7,7 +7,6 @@ import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity.Companion.DEFAULT_BITCOIN_MAX_TIMEOUT
 import nl.tudelft.trustchain.currencyii.util.taproot.*
-import nl.tudelft.trustchain.currencyii.util.taproot.Address
 import org.bitcoinj.core.*
 import org.bitcoinj.core.DumpedPrivateKey
 import org.bitcoinj.core.LegacyAddress
@@ -31,7 +30,6 @@ import java.net.URL
 import java.net.UnknownHostException
 import java.util.*
 import java.util.concurrent.*
-import kotlin.experimental.and
 
 const val TEST_NET_WALLET_NAME = "forwarding-service-testnet"
 const val REG_TEST_WALLET_NAME = "forwarding-service-regtest"
@@ -206,7 +204,7 @@ class WalletManager(
      * we are part of.
      * @return hex representation of our address
      */
-    fun protocolAddress(): org.bitcoinj.core.Address {
+    fun protocolAddress(): Address {
         return kit.wallet().issuedReceiveAddresses[0]
     }
 
@@ -226,14 +224,6 @@ class WalletManager(
      */
     fun networkPublicECKeyHex(): String {
         return protocolECKey().publicKeyAsHex
-    }
-
-    /**
-     * Return the public point of the nonce key
-     * @param swUniqueId - String, the id of the DAO where you want to get the nonce from
-     */
-    fun nonceECPointHex(swUniqueId: String, context: Context): String {
-        return getNonceKey(swUniqueId, context).second.getEncoded(true).toHex()
     }
 
     /**
@@ -259,24 +249,18 @@ class WalletManager(
         val (_, aggPubKey) = MuSig.generate_musig_key(listOf(protocolECKey()))
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
-        val programMusig = byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(
-            pubKeyDataMusig.drop(
-                1
-            )
-        ).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = TaprootUtil.key_to_witness(pubKeyDataMusig)
 
         val transaction = Transaction(params)
 
         transaction.addOutput(
-            entranceFee, org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            entranceFee, Address.fromString(params, addressMuSig)
         )
 
         // no fees since we are in a test network and this is a proof of concept still
         val req = SendRequest.forTx(transaction)
         req.changeAddress = protocolAddress()
-        req.feePerKb = Coin.valueOf(0)
+        req.feePerKb = Coin.valueOf(0) // TODO network should allow for fees per KB.
         req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
@@ -318,15 +302,12 @@ class WalletManager(
 
         val pubKeyDataMusig = aggPubKey.getEncoded(true)
 
-        val programMusig =
-            byteArrayOf(pubKeyDataMusig[0] and 1.toByte()).plus(pubKeyDataMusig.drop(1)).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = TaprootUtil.key_to_witness(pubKeyDataMusig)
 
         val newMultiSignatureOutputMoney = Coin.valueOf(oldMultiSignatureOutput).add(entranceFee)
         newTransaction.addOutput(
             newMultiSignatureOutputMoney,
-            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            Address.fromString(params, addressMuSig)
         )
 
         newTransaction.addInput(
@@ -466,7 +447,7 @@ class WalletManager(
         publicKeys: List<ECKey>,
         nonces: List<ECKey>,
         key: ECKey,
-        receiverAddress: org.bitcoinj.core.Address,
+        receiverAddress: Address,
         paymentAmount: Long,
         walletId: String,
         context: Context
@@ -521,7 +502,7 @@ class WalletManager(
         signaturesOfOldOwners: List<BigInteger>,
         aggregateNonce: ECPoint,
         oldTransactionSerialized: String,
-        receiverAddress: org.bitcoinj.core.Address,
+        receiverAddress: Address,
         paymentAmount: Long
     ): Pair<Boolean, String> {
         val (_, aggPubKey) = MuSig.generate_musig_key(publicKeys)
@@ -556,15 +537,12 @@ class WalletManager(
         oldTransactionSerialized: String,
         pubKeyDataMuSig: ByteArray,
         paymentAmount: Long,
-        receiverAddress: org.bitcoinj.core.Address
+        receiverAddress: Address
     ): Pair<CTransaction, CTransaction> {
         val newTransaction = Transaction(params)
         val oldTransaction = CTransaction().deserialize(oldTransactionSerialized.hexToBytes())
 
-        val programMusig =
-            byteArrayOf(pubKeyDataMuSig[0] and 1.toByte()).plus(pubKeyDataMuSig.drop(1)).toHex()
-        val version = 1
-        val addressMuSig = Address.program_to_witness(version, programMusig.hexToBytes())
+        val addressMuSig = TaprootUtil.key_to_witness(pubKeyDataMuSig)
 
         val newMultiSignatureOutputMoney = Coin.valueOf(paymentAmount)
         newTransaction.addOutput(newMultiSignatureOutputMoney, receiverAddress)
@@ -581,7 +559,7 @@ class WalletManager(
 
         newTransaction.addOutput(
             Coin.valueOf(oldMultiSignatureOutput - paymentAmount),
-            org.bitcoinj.core.Address.fromString(params, addressMuSig)
+            Address.fromString(params, addressMuSig)
         )
 
         val newCTx = CTransaction().deserialize(newTransaction.bitcoinSerialize())
@@ -644,7 +622,7 @@ class WalletManager(
      */
     fun addNewNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
         val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
-        val nonce = Key.generate_schnorr_nonce(ECKey().privKeyBytes)
+        val nonce = TaprootUtil.generate_schnorr_nonce(ECKey().privKeyBytes)
         val privateKey = nonce.first.privKey.toByteArray().toHex()
         val editor = nonceKeyData.edit()
         Log.i("NONCE_KEY", "New key created for DAO: $swUniqueId")
@@ -661,7 +639,7 @@ class WalletManager(
      */
     private fun getNonceKey(swUniqueId: String, context: Context): Pair<ECKey, ECPoint> {
         val nonceKeyData = context.getSharedPreferences("nonce_keys", 0)!!
-        return Key.generate_schnorr_nonce(nonceKeyData.getString(swUniqueId, "")!!.hexToBytes())
+        return TaprootUtil.generate_schnorr_nonce(nonceKeyData.getString(swUniqueId, "")!!.hexToBytes())
     }
 
     companion object {
