@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii
 
+import android.app.Activity
 import android.content.Context
 import nl.tudelft.ipv8.Community
 import nl.tudelft.ipv8.android.IPv8Android
@@ -72,14 +73,16 @@ class CoinCommunity : Community() {
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
         responses: List<SWResponseSignatureBlockTD>,
-        context: Context
+        context: Context,
+        activity: Activity
     ) {
         daoJoinHelper.joinBitcoinWallet(
             myPeer,
             walletBlockData,
             blockData,
             responses,
-            context
+            context,
+            activity
         )
     }
 
@@ -120,7 +123,8 @@ class CoinCommunity : Community() {
         responses: List<SWResponseSignatureBlockTD>,
         receiverAddress: String,
         satoshiAmount: Long,
-        context: Context
+        context: Context,
+        activity: Activity
     ) {
         daoTransferFundsHelper.transferFunds(
             myPeer,
@@ -130,7 +134,8 @@ class CoinCommunity : Community() {
             responses,
             receiverAddress,
             satoshiAmount,
-            context
+            context,
+            activity
         )
     }
 
