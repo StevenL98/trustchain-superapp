@@ -226,14 +226,6 @@ class WalletManager(
 
     /**
      * Return the public point of the nonce key
-     * @param swUniqueId - String, the id of the DAO where you want to get the nonce from
-     */
-    fun nonceECPointHex(swUniqueId: String, context: Context): String {
-        return getNonceKey(swUniqueId, context).second.getEncoded(true).toHex()
-    }
-
-    /**
-     * Return the public point of the nonce key
      * @param - Pair, the private and public key of the nonce
      */
     fun nonceECPointHex(nonce: Pair<ECKey, ECPoint>): String {
@@ -266,7 +258,7 @@ class WalletManager(
         // no fees since we are in a test network and this is a proof of concept still
         val req = SendRequest.forTx(transaction)
         req.changeAddress = protocolAddress()
-        req.feePerKb = Coin.valueOf(0)
+        req.feePerKb = Coin.valueOf(0) // TODO network should allow for fees per KB.
         req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
