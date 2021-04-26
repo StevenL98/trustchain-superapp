@@ -44,18 +44,6 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO refactor javadoc (make sure it's up to date) and add useful logging (also for other classes)
 
-// TODO disable MAINNET and TESTNET buttons and add disclaimer to not send or use real bitcoins
-
-// TODO after signing, go back to previous screen
-
-// TODO tests
-
-// TODO Sending taproot transaction to the server fails, when voting from multiple devices
-
-// TODO not automatically showing votes as they come in
-
-// TODO sloop fee eruit
-
 // TODO only allow one proposal at a time (not multiple transfers or multiple joins)
 
 /**
