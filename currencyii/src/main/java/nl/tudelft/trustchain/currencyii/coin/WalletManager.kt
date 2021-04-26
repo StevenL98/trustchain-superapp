@@ -48,7 +48,7 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
 // TODO crawl trustchain after successful transaction
 
-// TODO app crashes after the original DAO creator votes
+// TODO create new tab in app with previous DAO transactions/joins
 
 /**
  * The wallet manager which encapsulates the functionality of all possible interactions
