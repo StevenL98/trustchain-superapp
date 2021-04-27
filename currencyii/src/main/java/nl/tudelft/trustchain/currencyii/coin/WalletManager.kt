@@ -52,6 +52,11 @@ var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
  * The wallet manager which encapsulates the functionality of all possible interactions
  * with bitcoin wallets (including multi-signature wallets).
  * NOTE: Ideally should be separated from any Android UI concepts. Not the case currently.
+ *
+ * Note: we make use of RegTest server located at IP 131.180.27.224, server code can be found
+ * either on the server in /home/bitcoin or in the zip in the docs folder under currencyii in this code base.
+ * In these locations you can find all information to run the regtest and python server.
+ * Make sure to also change the IP's (and URLs) in the kotlin code when swapping to a different server.
  */
 @Suppress("DEPRECATION", "NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
 class WalletManager(
