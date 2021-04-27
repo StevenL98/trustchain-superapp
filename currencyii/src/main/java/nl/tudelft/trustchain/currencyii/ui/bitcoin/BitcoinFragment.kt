@@ -151,7 +151,7 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
                 getBitcoinPressed = true
 
                 if (!addBTC(walletManager.protocolAddress().toString())) {
-                    Log.i("Coin", "The server response is failing")
+                    Log.e("Coin", "The server response is failing")
                     Toast.makeText(this.requireContext(), "Something went wrong, please delete system32", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this.requireContext(), "Successfully added 10 BTC", Toast.LENGTH_SHORT).show()
@@ -209,6 +209,7 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     /**
      * Add bitcoin to the wallet
      * @param address - The address where I have to send the BTC to.
+     * @return Boolean - if the transaction was successful
      */
     private fun addBTC(address: String): Boolean {
         val executor: ExecutorService = Executors.newCachedThreadPool(Executors.defaultThreadFactory())

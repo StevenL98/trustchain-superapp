@@ -233,7 +233,7 @@ class WalletManager(
      * Calculates the MuSig address and sends the entrance fee to it.
      *
      * @param entranceFee the entrance fee you are sending
-     * @return TransactionPackage
+     * @return Pair<Boolean, String> - successfully send the transaction, serializedTransaction
      */
     fun safeCreationAndSendGenesisWallet(
         entranceFee: Coin
@@ -256,8 +256,8 @@ class WalletManager(
         req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
-        Log.i("YEET", "txid: " + req.tx.txId.toString())
-        Log.i("YEET", "serialized tx: " + req.tx.bitcoinSerialize().toHex())
+        Log.i("Coin", "SafeCreationAndSendGensisWallet - txid: " + req.tx.txId.toString())
+        Log.i("Coin", "SafeCreationAndSendGensisWallet - serialized tx: " + req.tx.bitcoinSerialize().toHex())
 
         val serializedTransaction = req.tx.bitcoinSerialize()
 
@@ -323,8 +323,8 @@ class WalletManager(
 
         kit.wallet().signTransaction(req)
 
-        Log.i("YEET", "newtxid: " + newTransaction.txId.toString())
-        Log.i("YEET", "serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
+        Log.i("Coin", "Joining DAO - newtxid: " + newTransaction.txId.toString())
+        Log.i("Coin", "Joining DAO - serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
 
         // TODO there is probably a bug if multiple vins are required by our own wallet (for example, multiple small txin's combined to 1 big vout)
 
@@ -337,7 +337,7 @@ class WalletManager(
      * @param newTransaction the new transaction
      * @param oldTransaction the old transaction
      * @param key the key that will be signed with
-     * @return the signature (you need to send back)
+     * @return BigInteger
      */
     fun safeSigningJoinWalletTransaction(
         oldTransaction: CTransaction,
@@ -351,9 +351,6 @@ class WalletManager(
         val (cMap, aggPubKey) = MuSig.generate_musig_key(publicKeys)
 
         val detKey = key as DeterministicKey
-
-        val yeet = detKey.privKey
-        Log.i("YEET", "privkey: $yeet")
 
         val privChallenge1 = detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(
             Schnorr.n
@@ -378,7 +375,7 @@ class WalletManager(
             sighashMuSig
         )
 
-        Log.i("YEET", "nonce_key priv: " + getNonceKey(walletId, context).first.privKey.toString())
+        Log.i("NONCE_KEY", "nonce_key priv: " + getNonceKey(walletId, context).first.privKey.toString())
 
         return signature
     }
@@ -389,7 +386,7 @@ class WalletManager(
      * @param signaturesOfOldOwners signatures (of the OLD owners only, in correct order)
      * @param aggregateNonce
      * @param newTransaction SendRequest
-     * @return TransactionPackage?
+     * @return Pair<Boolean, String> - successfully send the transaction, serializedTransaction
      */
     fun safeSendingJoinWalletTransaction(
         signaturesOfOldOwners: List<BigInteger>,
@@ -432,7 +429,7 @@ class WalletManager(
      * @param paymentAmount amount for receiver address
      * @param walletId the wallet id where the transaction is being signed from
      * @param context used to retrieve the nonce key of the user to sign
-     * @return ECDSASignature
+     * @return BigInteger
      */
     fun safeSigningTransactionFromMultiSig(
         oldTransactionSerialized: String,
@@ -487,7 +484,7 @@ class WalletManager(
      * @param oldTransactionSerialized PREVIOUS transaction with the multi-sig output
      * @param receiverAddress receiver address
      * @param paymentAmount amount for receiver address
-     * @return transaction
+     * @return Pair<Boolean, String> - successfully send the transaction, serializedTransaction
      */
     fun safeSendingTransactionFromMultiSig(
         publicKeys: List<ECKey>,
@@ -524,6 +521,7 @@ class WalletManager(
      * @param pubKeyDataMuSig MuSig public key as defined in the MuSig paper
      * @param paymentAmount the amount that needs to be transferred
      * @param receiverAddress the address where the payment needs to go
+     * @return Pair<CTransaction, CTransaction> - old and new transaction
      */
     private fun constructNewTransaction(
         oldTransactionSerialized: String,
@@ -561,7 +559,7 @@ class WalletManager(
     /**
      * Send the taproot transaction to the bitcoin server
      * @param transaction the CTransaction that needs to be send to the server
-     * @return if the server handled the request successfully.
+     * @return Boolean - if the server handled the request successfully.
      */
     private fun sendTaprootTransaction(transaction: CTransaction): Boolean {
         Log.i("Coin", "Sending serialized transaction to the server: ${transaction.serialize().toHex()}")

@@ -30,6 +30,9 @@ import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
     private var proposals: ArrayList<TrustChainBlock> = ArrayList()
 
+    /**
+     * Get all proposals for the user and show them in the UI
+     */
     private fun fetchProposalsAndUpdateUI() {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
@@ -42,6 +45,9 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
         }
     }
 
+    /**
+     * Update the proposals and show them in the UI
+     */
     private fun updateProposalListUI() {
         activity?.runOnUiThread {
             val uniqueProposals: ArrayList<TrustChainBlock> = ArrayList()
@@ -60,7 +66,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                         val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
-                        Log.i("Coin", "transfer voting failed: ${t.message ?: "no message"}")
+                        Log.e("Coin", "transfer voting failed: ${t.message ?: "no message"}")
                     }
                 }
                 if (block.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
@@ -68,13 +74,18 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
                         val bundle = bundleOf("type" to block.type, "blockId" to block.blockId)
                         findNavController().navigate(R.id.votesFragment, bundle)
                     } catch (t: Throwable) {
-                        Log.i("Coin", "join voting failed: ${t.message ?: "no message"}")
+                        Log.e("Coin", "join voting failed: ${t.message ?: "no message"}")
                     }
                 }
             }
         }
     }
 
+    /**
+     * Check whether the user is in that wallet, otherwise he should not see that specific proposal
+     * @param proposal - the concerning wallet
+     * @return Boolean - if the user is in the wallet
+     */
     private fun isUserInWallet(proposal: TrustChainBlock): Boolean {
         val walletID = if (proposal.type == CoinCommunity.SIGNATURE_ASK_BLOCK) {
             SWSignatureAskTransactionData(proposal.transaction).getData().SW_UNIQUE_ID
@@ -84,6 +95,10 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
         return getUserWalletIds().contains(walletID)
     }
 
+    /**
+     * Get all the wallets of the user
+     * @return list of wallet ids
+     */
     private fun getUserWalletIds(): List<String> {
         val myPublicKey = getTrustChainCommunity().myPeer.publicKey.keyToBin().toHex()
         val wallets = getCoinCommunity().fetchLatestJoinedSharedWalletBlocks().map { SWJoinBlockTransactionData(it.transaction).getData() }
@@ -93,6 +108,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 
     /**
      * Update the currently stored proposals. Only new and unique proposals are added.
+     * @param newProposals - the new proposals that need to be added to the UI
      */
     private fun updateProposals(newProposals: List<TrustChainBlock>) {
         val coinCommunity = getCoinCommunity()
@@ -140,7 +156,7 @@ class MyProposalsFragment : BaseFragment(R.layout.fragment_my_proposals) {
 //                }
             } catch (t: Throwable) {
                 val message = t.message ?: "no message"
-                Log.i("Coin", "Crawling failed for: ${peer.address} message: $message")
+                Log.e("Coin", "Crawling failed for: ${peer.address} message: $message")
             }
         }
     }
