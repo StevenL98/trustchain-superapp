@@ -42,11 +42,9 @@ const val REG_TEST_FAUCET_DOMAIN = "taproot.tribler.org"
 
 var MIN_BLOCKCHAIN_PEERS = MIN_BLOCKCHAIN_PEERS_TEST_NET
 
-// TODO refactor javadoc (make sure it's up to date) and add useful logging (also for other classes)
-
 // TODO only allow one proposal at a time (not multiple transfers or multiple joins)
 
-// TODO crawl trustchain after successful transaction
+// TODO bug with UI: need to switch tabs after join/transaction to refresh the number of dao users and balance
 
 // TODO create new tab in app with previous DAO transactions/joins
 
@@ -250,9 +248,11 @@ class WalletManager(
         )
 
         // no fees since we are in a test network and this is a proof of concept still
+        // TODO all transactions in this class should use fees to make it more realistic
+        // (and to make it able to run on MAINNET or TESTNET once they allow taproot transactions)
         val req = SendRequest.forTx(transaction)
         req.changeAddress = protocolAddress()
-        req.feePerKb = Coin.valueOf(0) // TODO network should allow for fees per KB.
+        req.feePerKb = Coin.valueOf(0)
         req.ensureMinRequiredFee = false
         kit.wallet().completeTx(req)
 
@@ -324,7 +324,7 @@ class WalletManager(
         kit.wallet().signTransaction(req)
 
         Log.i("Coin", "Joining DAO - newtxid: " + newTransaction.txId.toString())
-        Log.i("Coin", "Joining DAO - serialized new tx: " + newTransaction.bitcoinSerialize().toHex())
+        Log.i("Coin", "Joining DAO - serialized new tx without signatures: " + newTransaction.bitcoinSerialize().toHex())
 
         // TODO there is probably a bug if multiple vins are required by our own wallet (for example, multiple small txin's combined to 1 big vout)
 
@@ -414,6 +414,8 @@ class WalletManager(
 
         newTransaction.wit = cTxWitness
 
+        Log.i("Coin", "Joining DAO - serialized new tx with signatures: " + newTransaction.serialize().toHex())
+
         return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
 
@@ -452,6 +454,8 @@ class WalletManager(
             paymentAmount,
             receiverAddress
         )
+
+        Log.i("Coin", "Transfer funds DAO - serialized new tx without signature: " + newTransaction.serialize().toHex())
 
         val privChallenge =
             detKey.privKey.multiply(BigInteger(1, cMap[key.decompress()])).mod(Schnorr.n)
@@ -511,6 +515,8 @@ class WalletManager(
         val cTxWitness = CTxWitness(arrayOf(cTxInWitness))
 
         newTransaction.wit = cTxWitness
+
+        Log.i("Coin", "Transfer funds DAO - final serialized new tx with signature: " + newTransaction.serialize().toHex())
 
         return Pair(sendTaprootTransaction(newTransaction), newTransaction.serialize().toHex())
     }
