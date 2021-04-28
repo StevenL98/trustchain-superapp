@@ -12,9 +12,6 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat.getSystemService
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
-import com.android.volley.Request
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
 import kotlinx.android.synthetic.main.bitcoin_networks.*
 import kotlinx.android.synthetic.main.fragment_bitcoin.*
 import nl.tudelft.trustchain.currencyii.R
@@ -23,8 +20,12 @@ import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.NetworkParameters
 import org.bitcoinj.wallet.Wallet
+import java.lang.Exception
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.*
 
-const val BALANCE_THRESHOLD = "10"
+const val BALANCE_THRESHOLD = "5"
 /**
  * A simple [Fragment] subclass.
  * Use the [BitcoinFragment.newInstance] factory method to
@@ -33,7 +34,7 @@ const val BALANCE_THRESHOLD = "10"
 class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     ImportKeyDialog.ImportKeyDialogListener {
 
-    private var getBitcoinPressed = false
+        private var getBitcoinPressed = false
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
@@ -148,7 +149,18 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
         add_btc.setOnClickListener {
             if (!getBitcoinPressed) {
                 getBitcoinPressed = true
-                addBTC(walletManager.protocolAddress().toString())
+
+                if (!addBTC(walletManager.protocolAddress().toString())) {
+                    Log.e("Coin", "The server response is failing")
+                    Toast.makeText(this.requireContext(), "Something went wrong, please delete system32", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this.requireContext(), "Successfully added 10 BTC", Toast.LENGTH_SHORT).show()
+
+                    Thread.sleep(1000)
+
+                    Toast.makeText(this.requireContext(), "It can take up to a minute to register in your balance", Toast.LENGTH_SHORT).show()
+                    this.refresh(true)
+                }
             } else {
                 Toast.makeText(this.requireContext(), "You are already given an amount of BTC, please wait a little longer", Toast.LENGTH_SHORT).show()
             }
@@ -197,27 +209,36 @@ class BitcoinFragment : BaseFragment(R.layout.fragment_bitcoin),
     /**
      * Add bitcoin to the wallet
      * @param address - The address where I have to send the BTC to.
+     * @return Boolean - if the transaction was successful
      */
-    private fun addBTC(address: String) {
-        val queue = Volley.newRequestQueue(context)
-        val url = "http://$REG_TEST_FAUCET_IP:$REG_TEST_FAUCET_PORT?address=$address"
+    private fun addBTC(address: String): Boolean {
+        val executor: ExecutorService = Executors.newCachedThreadPool(Executors.defaultThreadFactory())
+        val future: Future<Boolean>
 
-        val stringRequest = StringRequest(
-            Request.Method.GET, url,
-            {
-                Log.i("Coin", "Successfully added bitcoin to $address")
-                Toast.makeText(context, "Successfully added bitcoin", Toast.LENGTH_SHORT).show()
-                getBitcoinPressed = false
-                Thread.sleep(500)
-                this.refresh(true)
-            },
-            { error ->
-                Log.i("Coin", "Failed to add bitcoin to $address; error: $error")
-                Toast.makeText(context, "Failed to add bitcoin", Toast.LENGTH_SHORT).show()
-                getBitcoinPressed = false
-            })
+        val url = "https://$REG_TEST_FAUCET_DOMAIN/addBTC?address=$address"
 
-        queue.add(stringRequest)
+        future = executor.submit(object : Callable<Boolean> {
+            override fun call(): Boolean {
+                val connection = URL(url).openConnection() as HttpURLConnection
+
+                try {
+                    // If it fails, check if there is enough balance available on the server
+                    // Otherwise reset the bitcoin network on the server (there is only 15k BTC available).
+                    // Also check if the Python server is still running!
+                    Log.i("Coin", url)
+                    Log.i("Coin", connection.responseMessage)
+                    return connection.responseCode == 200
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        })
+
+        return try {
+            future.get(10, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     override fun onCreateView(

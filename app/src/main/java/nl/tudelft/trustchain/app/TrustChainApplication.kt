@@ -102,6 +102,12 @@ class TrustChainApplication : Application() {
             }
         })
 
+        trustchain.registerBlockSigner(BLOCK_TYPE, object : BlockSigner {
+            override fun onSignatureRequest(block: TrustChainBlock) {
+                trustchain.createAgreementBlock(block, mapOf<Any?, Any?>())
+            }
+        })
+
         trustchain.addListener(BLOCK_TYPE, object : BlockListener {
             override fun onBlockReceived(block: TrustChainBlock) {
                 Log.d("TrustChainDemo", "onBlockReceived: ${block.blockId} ${block.transaction}")

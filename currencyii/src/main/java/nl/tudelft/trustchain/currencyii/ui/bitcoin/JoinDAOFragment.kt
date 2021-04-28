@@ -16,7 +16,9 @@ import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import nl.tudelft.trustchain.currencyii.R
+import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWJoinBlockTransactionData
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWResponseSignatureBlockTD
 import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
 import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 
@@ -146,8 +148,8 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
             list_view.setOnItemClickListener { _, view, position, id ->
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
-                        joinSharedWalletClicked(fetchedWallets[position])
                         Log.i("Coin", "Clicked: $view, $position, $id")
+                        joinSharedWalletClicked(uniqueWallets[position])
                     }
                 }
             }
@@ -177,7 +179,7 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
 //                }
             } catch (t: Throwable) {
                 val message = t.message ?: "No further information"
-                Log.i("Coin", "Crawling failed for: ${peer.publicKey}. $message.")
+                Log.e("Coin", "Crawling failed for: ${peer.publicKey}. $message.")
             }
         }
         disableRefresher()
@@ -197,16 +199,18 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
                 mostRecentSWBlock
             ).getData()
         } catch (t: Throwable) {
-            Log.i("Coin", "Join wallet proposal failed. ${t.message ?: "No further information"}.")
+            Log.e("Coin", "Join wallet proposal failed. ${t.message ?: "No further information"}.")
             setAlertText(t.message ?: "Unexpected error occurred. Try again")
             return
         }
 
+        val context = requireContext()
+        val activityRequired = requireActivity()
         // Wait and collect signatures
-        var signatures: List<String>? = null
+        var signatures: List<SWResponseSignatureBlockTD>? = null
         while (signatures == null) {
             Thread.sleep(1000)
-            signatures = collectJoinWalletSignatures(proposeBlockData)
+            signatures = collectJoinWalletResponses(proposeBlockData)
         }
 
         // Create a new shared wallet using the signatures of the others.
@@ -216,10 +220,13 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
                 mostRecentSWBlock.transaction,
                 proposeBlockData,
                 signatures,
-                ::updateAlertLabel
+                context,
+                activityRequired
             )
+            // Add new nonceKey after joining a DAO
+            WalletManagerAndroid.getInstance().addNewNonceKey(proposeBlockData.SW_UNIQUE_ID, context)
         } catch (t: Throwable) {
-            Log.i("Coin", "Joining failed. ${t.message ?: "No further information"}.")
+            Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
             setAlertText(t.message ?: "Unexpected error occurred. Try again")
         }
 
@@ -228,39 +235,28 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
         setAlertText("You joined ${proposeBlockData.SW_UNIQUE_ID}!")
     }
 
-    private fun updateAlertLabel(progress: Double) {
-        Log.i("Coin", "Coin: broadcast of create genesis wallet transaction progress: $progress.")
-
-        if (progress >= 1) {
-            setAlertText("Join wallet progress: completed!")
-        } else {
-            val progressString = "%.0f".format(progress * 100)
-            setAlertText("Join wallet progress: $progressString%...")
-        }
-    }
-
     /**
-     * Collect the signatures of a join proposal. Returns true if enough signatures are found.
+     * Collect the signatures of a join proposal
      */
-    private fun collectJoinWalletSignatures(
+    private fun collectJoinWalletResponses(
         blockData: SWSignatureAskBlockTD
-    ): List<String>? {
-        val signatures =
-            getCoinCommunity().fetchProposalSignatures(
+    ): List<SWResponseSignatureBlockTD>? {
+        val responses =
+            getCoinCommunity().fetchProposalResponses(
                 blockData.SW_UNIQUE_ID,
                 blockData.SW_UNIQUE_PROPOSAL_ID
             )
         Log.i(
             "Coin",
-            "Waiting for signatures. ${signatures.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
+            "Waiting for signatures. ${responses.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
         )
 
         setAlertText(
-            "Collecting signatures: ${signatures.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
+            "Collecting signatures: ${responses.size}/${blockData.SW_SIGNATURES_REQUIRED} received!"
         )
 
-        if (signatures.size >= blockData.SW_SIGNATURES_REQUIRED) {
-            return signatures
+        if (responses.size >= blockData.SW_SIGNATURES_REQUIRED) {
+            return responses
         }
         return null
     }
